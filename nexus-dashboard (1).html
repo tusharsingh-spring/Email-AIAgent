@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NEXUS — AI Agent Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060709;--bg2:#0c0e15;--bg3:#10121a;--bg4:#161821;--bg5:#1c1f2c;
+  --bdr:rgba(255,255,255,0.045);--bdr2:rgba(255,255,255,0.085);--bdr3:rgba(255,255,255,0.14);
+  --tx:#d8dbec;--tx2:#7e86a0;--tx3:#454c62;
+  --a:#6c5ff5;--a2:#9b93ff;--aglow:rgba(108,95,245,0.12);--aglow2:rgba(108,95,245,0.06);
+  --teal:#00bfa5;--tdim:rgba(0,191,165,0.1);
+  --amb:#f59f00;--adim:rgba(245,159,0,0.1);
+  --grn:#40c057;--gdim:rgba(64,192,87,0.1);
+  --red:#f03e3e;--rdim:rgba(240,62,62,0.11);
+  --blu:#3b82f6;--bdim:rgba(59,130,246,0.1);
+  --pur:#a855f7;--pdim:rgba(168,85,247,0.1);
+  --r:12px;--rs:7px;--sw:228px;
+}
+html{font-size:13px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{background:var(--bg);color:var(--tx);font-family:'DM Sans',sans-serif;line-height:1.55;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:var(--bg5);border-radius:2px}
+
+/* ── Layout ── */
+.shell{display:flex;min-height:100vh}
+.rail{width:var(--sw);min-height:100vh;background:var(--bg2);border-right:1px solid var(--bdr);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:100;overflow-y:auto}
+.body{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{height:50px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 18px;gap:12px;position:sticky;top:0;z-index:50}
+.content{flex:1;padding:18px;overflow-y:auto}
+
+/* ── Sidebar ── */
+.brand{padding:16px 14px 12px;border-bottom:1px solid var(--bdr)}
+.brand-inner{display:flex;align-items:center;gap:9px}
+.brand-mark{width:28px;height:28px;background:var(--a);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:#fff;letter-spacing:-.3px}
+.brand-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;letter-spacing:-.2px}
+.brand-sub{font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;letter-spacing:.5px;margin-top:1px}
+
+.nav-grp{padding:12px 10px 5px;font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;letter-spacing:.9px;text-transform:uppercase}
+.nav-i{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:1px 7px;border-radius:var(--rs);cursor:pointer;transition:.12s;color:var(--tx2);font-size:12px;user-select:none}
+.nav-i:hover{background:var(--bg4);color:var(--tx)}
+.nav-i.on{background:var(--aglow);color:var(--a2);border:1px solid rgba(108,95,245,.16)}
+.nav-i .ico{font-size:14px;width:16px;text-align:center;flex-shrink:0}
+.nav-nb{margin-left:auto;border-radius:9px;padding:1px 6px;font-size:9px;font-family:'DM Mono',monospace;font-weight:500;min-width:16px;text-align:center}
+.nb-r{background:var(--red);color:#fff}.nb-a{background:var(--amb);color:#1a1000}.nb-g{background:var(--grn);color:#071a09}
+
+.rail-foot{margin-top:auto;padding:12px;border-top:1px solid var(--bdr)}
+.status-row{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--tx2)}
+.dot{width:6px;height:6px;border-radius:50%}
+.dot-g{background:var(--grn);box-shadow:0 0 4px var(--grn)}
+.dot-a{background:var(--amb)}
+.dot-r{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.pulse{animation:pulse 1.8s infinite}
+
+/* ── Topbar ── */
+.tb-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;flex:1}
+.tb-right{display:flex;align-items:center;gap:7px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--rs);border:none;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;font-weight:500;transition:.12s;text-decoration:none;white-space:nowrap}
+.btn-a{background:var(--a);color:#fff}.btn-a:hover{background:var(--a2);color:#fff}
+.btn-g{background:transparent;color:var(--tx2);border:1px solid var(--bdr2)}.btn-g:hover{background:var(--bg4);color:var(--tx)}
+.btn-grn{background:var(--gdim);color:var(--grn);border:1px solid rgba(64,192,87,.2)}.btn-grn:hover{background:rgba(64,192,87,.2)}
+.btn-red{background:var(--rdim);color:var(--red);border:1px solid rgba(240,62,62,.2)}.btn-red:hover{background:rgba(240,62,62,.2)}
+.btn-sm{padding:4px 9px;font-size:10px}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn-full{width:100%;justify-content:center}
+
+/* ── Cards ── */
+.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);padding:16px}
+.card+.card{margin-top:12px}
+.card-t{font-family:'Syne',sans-serif;font-size:12px;font-weight:600;margin-bottom:12px}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+
+/* ── Grid ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+@media(max-width:800px){.g2,.g3,.g6{grid-template-columns:1fr 1fr}}
+
+/* ── Stats ── */
+.stat{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px}
+.sv{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;line-height:1;margin-bottom:2px}
+.sl{font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;letter-spacing:.4px;text-transform:uppercase}
+.sd{font-size:10px;margin-top:4px;color:var(--tx2)}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:12px;font-size:9px;font-family:'DM Mono',monospace;font-weight:500}
+.b-tl{background:var(--tdim);color:var(--teal)}
+.b-rd{background:var(--rdim);color:var(--red)}
+.b-am{background:var(--adim);color:var(--amb)}
+.b-gn{background:var(--gdim);color:var(--grn)}
+.b-bl{background:var(--bdim);color:var(--blu)}
+.b-pu{background:var(--pdim);color:var(--pur)}
+.b-gr{background:var(--bg5);color:var(--tx2)}
+
+/* ── Action cards ── */
+.ac{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:9px;overflow:hidden;transition:border-color .15s}
+.ac:hover{border-color:var(--bdr3)}
+.ac.esc{border-color:rgba(240,62,62,.25);background:rgba(240,62,62,.02)}
+.ac.sent{opacity:.52}
+.ac-h{display:flex;align-items:flex-start;gap:9px;padding:12px;cursor:pointer}
+.ac-av{width:32px;height:32px;border-radius:50%;background:var(--bg4);border:1px solid var(--bdr2);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;font-family:'Syne',sans-serif;font-weight:700;color:var(--a2)}
+.ac-from{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-sub{font-size:11px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.ac-meta{display:flex;align-items:center;gap:4px;margin-top:3px;flex-wrap:wrap}
+.ac-body{padding:10px 12px}
+.ac-foot{display:flex;align-items:center;gap:6px;padding:9px 12px;background:var(--bg3);flex-wrap:wrap}
+.draft{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--rs);padding:11px;font-size:11px;color:var(--tx2);line-height:1.7;white-space:pre-wrap;max-height:160px;overflow-y:auto;outline:none;transition:border-color .15s}
+.draft[contenteditable=true]{border-color:var(--a);color:var(--tx)}
+
+/* ── Email list ── */
+.ei{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-bottom:1px solid var(--bdr);cursor:pointer;transition:.12s}
+.ei:hover{background:var(--bg3)}
+.ei:last-child{border-bottom:none}
+.ei-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.ei-sub{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ei-pre{font-size:10px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.ei-from{font-size:10px;color:var(--tx3)}
+.ei-t{font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;flex-shrink:0;margin-top:2px}
+
+/* ── Calendar ── */
+.ev{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bdr)}
+.ev:last-child{border-bottom:none}
+.ev-bar{width:3px;height:32px;border-radius:2px;flex-shrink:0}
+.ev-title{font-size:12px;font-weight:500}
+.ev-when{font-size:10px;color:var(--tx2);margin-top:1px}
+.ev-who{font-size:10px;color:var(--tx3)}
+
+/* ── BRD ── */
+.brd-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:9px;overflow:hidden}
+.brd-h{display:flex;align-items:center;gap:9px;padding:12px;cursor:pointer;transition:.12s}
+.brd-h:hover{background:var(--bg3)}
+.brd-content{padding:12px;border-top:1px solid var(--bdr);font-size:11px;color:var(--tx2);line-height:1.7;max-height:220px;overflow-y:auto;white-space:pre-wrap;background:var(--bg3)}
+
+/* ── Live log ── */
+.log{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);height:158px;overflow-y:auto;padding:8px 10px;font-family:'DM Mono',monospace;font-size:10px;line-height:1.9}
+.ll{color:var(--tx3)}.ll .m.ok{color:var(--teal)}.ll .m.info{color:var(--tx2)}.ll .m.error{color:var(--red)}.ll .m.warn{color:var(--amb)}
+
+/* ── Upload zone ── */
+.dz{border:2px dashed var(--bdr2);border-radius:var(--r);padding:22px;text-align:center;cursor:pointer;transition:.15s;background:var(--bg3)}
+.dz:hover,.dz.drag{border-color:var(--a);background:var(--aglow)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--bdr);margin-bottom:14px}
+.tab{padding:6px 12px;font-size:11px;cursor:pointer;color:var(--tx2);border-bottom:2px solid transparent;transition:.12s;margin-bottom:-1px}
+.tab:hover{color:var(--tx)}.tab.on{color:var(--a2);border-bottom-color:var(--a)}
+
+/* ── Fields ── */
+.field{margin-bottom:10px}
+.field label{display:block;font-size:10px;color:var(--tx2);margin-bottom:4px;font-family:'DM Mono',monospace}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:7px 10px;color:var(--tx);font-size:12px;font-family:'DM Sans',sans-serif;outline:none;transition:.12s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--a)}
+.field textarea{min-height:80px;resize:vertical}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bdr)}
+.toggle-row:last-child{border-bottom:none}
+.tgl{position:relative;width:32px;height:17px;flex-shrink:0}
+.tgl input{opacity:0;width:0;height:0;position:absolute}
+.tgl-s{position:absolute;inset:0;background:var(--bg5);border-radius:8px;cursor:pointer;transition:.15s}
+.tgl-s::before{content:'';position:absolute;width:12px;height:12px;left:2.5px;top:2.5px;background:#fff;border-radius:50%;transition:.15s}
+.tgl input:checked+.tgl-s{background:var(--a)}
+.tgl input:checked+.tgl-s::before{transform:translateX(15px)}
+
+/* ── Progress ── */
+.prog-step{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bdr);font-size:11px}
+.prog-step:last-child{border-bottom:none}
+.ps-d{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ps-d.done{background:var(--grn)}.ps-d.active{background:var(--a);animation:pulse 1.2s infinite}.ps-d.idle{background:var(--bg5)}
+.ps-l{flex:1;color:var(--tx2)}.ps-l.done{color:var(--tx)}.ps-l.active{color:var(--a2)}
+
+/* ── Auth banner ── */
+.auth-ban{background:rgba(245,159,0,.04);border:1px solid rgba(245,159,0,.18);border-radius:var(--r);padding:13px 16px;display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.auth-ban.hidden{display:none}
+
+/* ── Page / view ── */
+.page{display:none}.page.on{display:block}
+.ph{margin-bottom:18px}
+.pt{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.4px}
+.ps{font-size:11px;color:var(--tx2);margin-top:3px}
+
+/* ── Toasts ── */
+.toasts{position:fixed;bottom:14px;right:14px;display:flex;flex-direction:column;gap:6px;z-index:2000;pointer-events:none}
+.toast{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--rs);padding:9px 13px;font-size:11px;display:flex;align-items:center;gap:7px;animation:si .18s ease;pointer-events:all;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+@keyframes si{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+
+/* ── Misc ── */
+.spin{width:13px;height:13px;border:2px solid var(--bdr2);border-top-color:var(--a);border-radius:50%;animation:spinr .6s linear infinite}
+@keyframes spinr{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:30px 14px;color:var(--tx3);font-size:11px}
+.empty .ei{font-size:24px;opacity:.35;margin-bottom:7px}
+code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace;font-size:10px;color:var(--a2)}
+.chip-input{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.chip{display:inline-flex;align-items:center;gap:3px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:10px;padding:2px 8px;font-size:10px;color:var(--tx2)}
+.chip .x{cursor:pointer;color:var(--tx3);margin-left:2px}.chip .x:hover{color:var(--red)}
+/* LangGraph step colours */
+.lg-node{background:var(--bg4);border:1px solid var(--bdr2);border-radius:5px;padding:3px 8px;font-size:9px;font-family:'DM Mono',monospace;color:var(--a2);margin-right:4px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="rail">
+  <div class="brand">
+    <div class="brand-inner">
+      <div class="brand-mark">NX</div>
+      <div>
+        <div class="brand-name">NEXUS</div>
+        <div class="brand-sub">langgraph · gmail · calendar</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-grp">Overview</div>
+  <div class="nav-i on"  onclick="nav('dashboard',this)"><span class="ico">⬡</span>Dashboard</div>
+
+  <div class="nav-grp">Email Agent</div>
+  <div class="nav-i" onclick="nav('inbox',this)"><span class="ico">✉</span>Inbox<span class="nav-nb nb-a" id="nb-inbox">0</span></div>
+  <div class="nav-i" onclick="nav('actions',this)"><span class="ico">⚡</span>Actions<span class="nav-nb nb-a" id="nb-actions">0</span></div>
+  <div class="nav-i" onclick="nav('escalations',this)"><span class="ico">▲</span>Escalations<span class="nav-nb nb-r" id="nb-esc">0</span></div>
+
+  <div class="nav-grp">BRD Agent</div>
+  <div class="nav-i" onclick="nav('brd',this)"><span class="ico">◈</span>BRD Generator<span class="nav-nb nb-g" id="nb-brd">0</span></div>
+  <div class="nav-i" onclick="nav('brd-upload',this)"><span class="ico">⬆</span>Upload Transcript</div>
+
+  <div class="nav-grp">Calendar</div>
+  <div class="nav-i" onclick="nav('calendar',this)"><span class="ico">▦</span>Events</div>
+
+  <div class="nav-grp">System</div>
+  <div class="nav-i" onclick="nav('settings',this)"><span class="ico">◌</span>Settings</div>
+  <div class="nav-i" onclick="nav('setup',this)"><span class="ico">◉</span>Setup & Auth</div>
+
+  <div class="rail-foot">
+    <div class="status-row"><div class="dot dot-a pulse" id="ws-dot"></div><span id="ws-lbl">Connecting...</span></div>
+    <div style="font-size:9px;color:var(--tx3);margin-top:3px;font-family:'DM Mono',monospace" id="owner-lbl">Not authenticated</div>
+    <div style="font-size:9px;color:var(--tx3);margin-top:2px;font-family:'DM Mono',monospace">LangGraph + Groq Llama 3.1</div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ══ -->
+<div class="body">
+<header class="topbar">
+  <div class="tb-title" id="tb-title">Dashboard</div>
+  <div class="tb-right">
+    <div style="font-size:10px;color:var(--tx2);display:flex;align-items:center;gap:4px" id="poll-ind">
+      <div class="dot dot-g pulse"></div>polling every 30s
+    </div>
+    <a class="btn btn-g btn-sm" href="http://localhost:8000/auth/login" target="_blank" id="auth-btn">🔑 Connect Google</a>
+    <button class="btn btn-a btn-sm" onclick="refreshAll()">↻</button>
+  </div>
+</header>
+
+<div class="content">
+
+<!-- AUTH BANNER -->
+<div class="auth-ban" id="auth-ban">
+  <div style="font-size:18px">🔑</div>
+  <div style="flex:1">
+    <div style="font-size:12px;font-weight:500;color:var(--amb)">Google account not connected</div>
+    <div style="font-size:10px;color:var(--tx2);margin-top:2px">Connect to read real Gmail and write to Google Calendar.</div>
+  </div>
+  <a class="btn btn-a btn-sm" href="http://localhost:8000/auth/login" target="_blank">Connect →</a>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div class="page on" id="page-dashboard">
+  <div class="ph"><div class="pt">Command Center</div><div class="ps">Real Gmail · Real Calendar · LangGraph multi-agent pipeline</div></div>
+
+  <!-- LangGraph flow indicator -->
+  <div class="card" style="margin-bottom:12px;padding:10px 14px">
+    <div style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;margin-bottom:6px">LANGGRAPH PIPELINE</div>
+    <div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap">
+      <span class="lg-node">intent router</span><span style="color:var(--tx3);font-size:10px">→</span>
+      <span class="lg-node">brd extract</span><span style="color:var(--tx3);font-size:10px">→</span>
+      <span class="lg-node">gap detect</span><span style="color:var(--tx3);font-size:10px">→</span>
+      <span class="lg-node">section writers ×9</span><span style="color:var(--tx3);font-size:10px">→</span>
+      <span class="lg-node">assembler</span><span style="color:var(--tx3);font-size:10px">|</span>
+      <span class="lg-node">calendar agent</span><span style="color:var(--tx3);font-size:10px">→</span>
+      <span class="lg-node">reply composer</span><span style="color:var(--tx3);font-size:10px">→</span>
+      <span class="lg-node" style="color:var(--red)">escalation</span>
+    </div>
+  </div>
+
+  <div class="g6" style="margin-bottom:12px">
+    <div class="stat"><div class="sv" id="s-proc" style="color:var(--a2)">—</div><div class="sl">Emails processed</div></div>
+    <div class="stat"><div class="sv" id="s-meet" style="color:var(--teal)">—</div><div class="sl">Meetings created</div></div>
+    <div class="stat"><div class="sv" id="s-pend" style="color:var(--amb)">—</div><div class="sl">Pending actions</div></div>
+    <div class="stat"><div class="sv" id="s-esc" style="color:var(--red)">—</div><div class="sl">Escalations</div></div>
+    <div class="stat"><div class="sv" id="s-brd" style="color:var(--pur)">—</div><div class="sl">BRDs generated</div></div>
+    <div class="stat"><div class="sv" id="s-auth" style="color:var(--red)">✕</div><div class="sl">Gmail connected</div></div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="ch"><div class="card-t">Pending actions</div><button class="btn btn-g btn-sm" onclick="nav('actions',null)">All →</button></div>
+      <div id="dash-actions"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="card-t">Live agent log</div><span class="badge b-gn">● LIVE</span></div>
+      <div class="log" id="live-log"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="ch"><div class="card-t">Upcoming calendar events</div><button class="btn btn-g btn-sm" onclick="nav('calendar',null)">→</button></div>
+    <div id="dash-events"></div>
+  </div>
+</div>
+
+<!-- ══ INBOX ══ -->
+<div class="page" id="page-inbox">
+  <div class="ph"><div class="pt">Real Inbox</div><div class="ps">Unread Gmail emails — NEXUS monitors these automatically</div></div>
+  <div class="g2">
+    <div class="card" style="padding:0">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">
+        <div class="card-t" style="margin:0">Unread emails</div>
+        <button class="btn btn-g btn-sm" onclick="loadInbox()">↻ Fetch</button>
+      </div>
+      <div id="inbox-list"><div class="empty"><div class="ei">✉</div>Click Fetch to load real emails</div></div>
+    </div>
+    <div class="card" id="email-detail">
+      <div class="empty"><div class="ei">✉</div>Select an email</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACTIONS ══ -->
+<div class="page" id="page-actions">
+  <div class="ph"><div class="pt">Agent Actions</div><div class="ps">AI-drafted replies — approve to send the real email and create calendar events</div></div>
+  <div class="tabs">
+    <div class="tab on" onclick="filterAct('all',this)">All</div>
+    <div class="tab" onclick="filterAct('pending',this)">Pending</div>
+    <div class="tab" onclick="filterAct('sent',this)">Sent</div>
+    <div class="tab" onclick="filterAct('rejected',this)">Rejected</div>
+  </div>
+  <div id="actions-list"></div>
+</div>
+
+<!-- ══ ESCALATIONS ══ -->
+<div class="page" id="page-escalations">
+  <div class="ph"><div class="pt">Escalations</div><div class="ps">LangGraph routed these to human review — urgency &gt; threshold or frustrated sentiment</div></div>
+  <div id="esc-list"></div>
+</div>
+
+<!-- ══ BRD ══ -->
+<div class="page" id="page-brd">
+  <div class="ph"><div class="pt">Generated BRDs</div><div class="ps">Business Requirements Documents generated from real emails and transcripts</div></div>
+  <div id="brd-list"><div class="empty"><div class="ei">◈</div>No BRDs yet — send an email asking for a BRD or upload a transcript</div></div>
+</div>
+
+<!-- ══ BRD UPLOAD ══ -->
+<div class="page" id="page-brd-upload">
+  <div class="ph"><div class="pt">Upload Transcript</div><div class="ps">Upload a meeting transcript, chat log, or email thread — NEXUS generates a full BRD</div></div>
+  <div class="g2">
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-t">Upload file</div>
+        <div class="dz" id="dz" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+          <div style="font-size:22px;margin-bottom:6px">⬡</div>
+          <div style="font-size:12px;font-weight:500">Drop .txt or .md file</div>
+          <div style="font-size:10px;color:var(--tx3);margin-top:3px">Meeting transcript · email thread · chat log</div>
+          <input type="file" id="upload-file" accept=".txt,.md,.csv" style="display:none" onchange="uploadFile(event)"/>
+        </div>
+        <button class="btn btn-g" style="margin-top:9px;font-size:11px" onclick="document.getElementById('upload-file').click()">📎 Browse file</button>
+      </div>
+      <div class="card">
+        <div class="card-t">Or paste directly</div>
+        <textarea id="paste-tx" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:9px;color:var(--tx);font-size:11px;font-family:'DM Sans',sans-serif;outline:none;min-height:110px;resize:vertical;transition:.12s" placeholder="Paste transcript here...
+
+[10:00] PM: We need a user auth system with SSO by Q2
+[10:02] CTO: Must handle 10k concurrent users, 99.9% uptime
+[10:05] Designer: Mobile-first, onboarding under 3 clicks
+[10:08] PM: Budget $150k, GDPR compliance required"></textarea>
+        <button class="btn btn-a btn-full" style="margin-top:8px" onclick="pasteTx()">
+          <div class="spin" id="tx-spin" style="display:none"></div>
+          Generate BRD from transcript
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-t">Agent progress</div>
+      <div id="brd-progress">
+        <div class="prog-step" id="ps-ingestion"><div class="ps-d idle"></div><div class="ps-l idle">Ingestion — cleaning inputs</div></div>
+        <div class="prog-step" id="ps-extraction"><div class="ps-d idle"></div><div class="ps-l idle">Extraction — stakeholders, requirements</div></div>
+        <div class="prog-step" id="ps-gap_detection"><div class="ps-d idle"></div><div class="ps-l idle">Gap detection — finding missing info</div></div>
+        <div class="prog-step" id="ps-writing"><div class="ps-d idle"></div><div class="ps-l idle">Section writers — 9 sections parallel</div></div>
+        <div class="prog-step" id="ps-assembly"><div class="ps-d idle"></div><div class="ps-l idle">Assembler — consistency check</div></div>
+        <div class="prog-step" id="ps-docx"><div class="ps-d idle"></div><div class="ps-l idle">DOCX export</div></div>
+      </div>
+      <div id="brd-result-preview" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CALENDAR ══ -->
+<div class="page" id="page-calendar">
+  <div class="ph"><div class="pt">Google Calendar</div><div class="ps">Real events — NEXUS writes here when you approve scheduling actions</div></div>
+  <div class="card">
+    <div class="ch"><div class="card-t">Upcoming (14 days)</div><button class="btn btn-g btn-sm" onclick="loadCalendar()">↻ Sync</button></div>
+    <div id="cal-list"><div class="empty"><div class="ei">▦</div>Click Sync to load real calendar</div></div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div class="page" id="page-settings">
+  <div class="ph"><div class="pt">Settings</div><div class="ps">Configure NEXUS agent behavior</div></div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-t" style="margin-bottom:12px">Scheduling</div>
+      <div class="field"><label>Buffer between meetings (mins)</label><input type="number" value="10" id="s-buf"/></div>
+      <div class="field"><label>Work hours start</label><input type="time" value="09:00" id="s-ws"/></div>
+      <div class="field"><label>Work hours end</label><input type="time" value="18:00" id="s-we"/></div>
+      <div class="field"><label>Escalation threshold (0–100)</label>
+        <input type="range" min="0" max="100" value="70" id="s-thr" oninput="document.getElementById('thr-v').textContent=this.value"/>
+        <span id="thr-v" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--a2);margin-left:6px">70</span>
+      </div>
+      <div class="field"><label>Email tone</label><select id="s-tone"><option>professional</option><option>friendly</option><option>concise</option></select></div>
+      <button class="btn btn-a" onclick="saveSettings()">Save</button>
+    </div>
+    <div class="card">
+      <div class="card-t" style="margin-bottom:10px">Agent behavior</div>
+      <div class="toggle-row"><div><div style="font-size:12px">Auto-approve low-urgency replies</div><div style="font-size:10px;color:var(--tx3)">Send without human review</div></div><label class="tgl"><input type="checkbox"/><span class="tgl-s"></span></label></div>
+      <div class="toggle-row"><div><div style="font-size:12px">Auto-create calendar events</div></div><label class="tgl"><input type="checkbox" checked/><span class="tgl-s"></span></label></div>
+      <div class="toggle-row"><div><div style="font-size:12px">Sentiment escalation</div><div style="font-size:10px;color:var(--tx3)">Route frustrated emails to human</div></div><label class="tgl"><input type="checkbox" checked/><span class="tgl-s"></span></label></div>
+      <div class="toggle-row"><div><div style="font-size:12px">BRD auto-detect from emails</div><div style="font-size:10px;color:var(--tx3)">Keywords trigger BRD pipeline</div></div><label class="tgl"><input type="checkbox" checked/><span class="tgl-s"></span></label></div>
+      <div class="toggle-row"><div><div style="font-size:12px">10-min buffer enforcement</div></div><label class="tgl"><input type="checkbox" checked/><span class="tgl-s"></span></label></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SETUP ══ -->
+<div class="page" id="page-setup">
+  <div class="ph"><div class="pt">Setup & Authentication</div><div class="ps">Everything you need to get NEXUS running with real Google APIs</div></div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-t" style="margin-bottom:12px">Setup steps</div>
+      <div class="prog-step"><div class="ps-d done"></div><div class="ps-l done">Install: <code>pip install -r requirements.txt</code></div></div>
+      <div class="prog-step"><div class="ps-d active"></div><div class="ps-l active">Google Cloud Console → enable Gmail API + Calendar API → OAuth2 Desktop → download <code>credentials.json</code></div></div>
+      <div class="prog-step"><div class="ps-d idle"></div><div class="ps-l idle">Copy <code>.env.example</code> → <code>.env</code> · add <code>GROQ_API_KEY</code> (free at console.groq.com)</div></div>
+      <div class="prog-step"><div class="ps-d idle"></div><div class="ps-l idle"><code>uvicorn main:app --reload --port 8000</code></div></div>
+      <div class="prog-step"><div class="ps-d idle"></div><div class="ps-l idle">Click "Connect Google" → one-time OAuth consent → <code>token.json</code> saved</div></div>
+      <div class="prog-step"><div class="ps-d idle"></div><div class="ps-l idle">NEXUS is live — polls Gmail every 30s, LangGraph handles everything</div></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-t" style="margin-bottom:9px">What's real</div>
+        <table style="width:100%;font-size:10px;border-collapse:collapse">
+          <tr style="border-bottom:1px solid var(--bdr)"><td style="padding:7px 5px;color:var(--tx2)">Gmail inbox</td><td><span class="badge b-gn">REAL</span></td><td style="color:var(--tx3);padding:7px 5px">Gmail API OAuth2</td></tr>
+          <tr style="border-bottom:1px solid var(--bdr)"><td style="padding:7px 5px;color:var(--tx2)">Send emails</td><td><span class="badge b-gn">REAL</span></td><td style="color:var(--tx3);padding:7px 5px">Gmail API send</td></tr>
+          <tr style="border-bottom:1px solid var(--bdr)"><td style="padding:7px 5px;color:var(--tx2)">Calendar events</td><td><span class="badge b-gn">REAL</span></td><td style="color:var(--tx3);padding:7px 5px">Calendar API + invites</td></tr>
+          <tr style="border-bottom:1px solid var(--bdr)"><td style="padding:7px 5px;color:var(--tx2)">Free/busy check</td><td><span class="badge b-gn">REAL</span></td><td style="color:var(--tx3);padding:7px 5px">Freebusy API</td></tr>
+          <tr style="border-bottom:1px solid var(--bdr)"><td style="padding:7px 5px;color:var(--tx2)">Intent routing</td><td><span class="badge b-pu">LangGraph</span></td><td style="color:var(--tx3);padding:7px 5px">State machine graph</td></tr>
+          <tr style="border-bottom:1px solid var(--bdr)"><td style="padding:7px 5px;color:var(--tx2)">BRD generation</td><td><span class="badge b-pu">LangGraph</span></td><td style="color:var(--tx3);padding:7px 5px">9 parallel agents</td></tr>
+          <tr><td style="padding:7px 5px;color:var(--tx2)">LLM</td><td><span class="badge b-tl">Llama 3.1</span></td><td style="color:var(--tx3);padding:7px 5px">Groq (open-source)</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-t" style="margin-bottom:8px">Key endpoints</div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;line-height:2.1;color:var(--tx2)">
+          <div><span style="color:var(--teal)">GET  </span>/auth/login → Google consent</div>
+          <div><span style="color:var(--teal)">GET  </span>/api/emails → real inbox</div>
+          <div><span style="color:var(--grn)">POST </span>/api/actions/:id/approve → send real email</div>
+          <div><span style="color:var(--teal)">GET  </span>/api/calendar/events → real calendar</div>
+          <div><span style="color:var(--grn)">POST </span>/api/brd/from-upload → upload → BRD</div>
+          <div><span style="color:var(--teal)">GET  </span>/api/brd/:id/download → DOCX</div>
+          <div><span style="color:var(--amb)">WS   </span>/ws/live → real-time push</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /body -->
+</div><!-- /shell -->
+<div class="toasts" id="toasts"></div>
+
+<script>
+const API = 'http://localhost:8000';
+let ws = null, state = {actions:[], events:[], emails:[], brds:{}, authenticated:false};
+let actFilter = 'all';
+
+/* ── WebSocket ── */
+function connectWS() {
+  ws = new WebSocket(`ws://localhost:8000/ws/live`);
+  ws.onopen = () => {
+    setDot('g','Connected · LangGraph active');
+    log('ok','NEXUS WebSocket connected');
+  };
+  ws.onclose = () => {
+    setDot('a','Disconnected — retrying...');
+    setTimeout(connectWS, 3000);
+  };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+}
+
+function handle(msg) {
+  if (msg.type === 'init') {
+    state.authenticated = msg.authenticated;
+    if (msg.actions) state.actions = [...msg.actions];
+    if (msg.meetings) state.events  = [...msg.meetings];
+    updateAuth(msg.authenticated);
+    if (msg.stats) updateStats(msg.stats);
+    renderDash(); renderActions(); updateBadges();
+  }
+  if (msg.type === 'log')          log(msg.level, msg.msg);
+  if (msg.type === 'new_action')   { state.actions.unshift(msg.payload); renderDash(); renderActions(); updateBadges(); toast('New action: '+msg.payload.email?.subject,'ok'); }
+  if (msg.type === 'escalation')   { state.actions.unshift(msg.payload); renderDash(); renderActions(); renderEsc(); updateBadges(); toast('ESCALATED: '+msg.payload.email?.subject,'warn'); }
+  if (msg.type === 'action_update'){ const a=state.actions.find(x=>x.id===msg.id); if(a)a.status=msg.status; renderActions(); updateBadges(); }
+  if (msg.type === 'meeting_created'){ state.events.unshift(msg.meeting); renderDash(); toast('Calendar event created: '+msg.meeting.title,'ok'); }
+  if (msg.type === 'brd_ready')   { state.brds[msg.job_id]={title:msg.title}; renderBRD(); updateBadges(); toast('BRD ready: '+msg.title,'ok'); advanceBRDProgress('docx'); }
+  if (msg.type === 'auth')        { state.authenticated=true; updateAuth(true); document.getElementById('owner-lbl').textContent=msg.email||'Connected'; toast('Google connected!','ok'); }
+}
+
+/* ── Auth ── */
+function updateAuth(ok) {
+  document.getElementById('auth-ban').classList.toggle('hidden', ok);
+  const s = document.getElementById('s-auth');
+  s.textContent = ok ? '✓' : '✕';
+  s.style.color = ok ? 'var(--grn)' : 'var(--red)';
+}
+
+async function checkAuth() {
+  try { const d = await (await fetch(`${API}/auth/status`)).json(); updateAuth(d.authenticated); if(d.email) document.getElementById('owner-lbl').textContent=d.email; } catch(e) { setDot('r','Backend offline'); }
+}
+
+/* ── Data ── */
+async function loadStats() {
+  try { const d = await (await fetch(`${API}/api/stats`)).json(); updateStats(d); updateAuth(d.authenticated); } catch(e){}
+}
+function updateStats(d) {
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v??'—'};
+  s('s-proc',d.processed||d.emails_processed); s('s-meet',d.meetings); s('s-pend',d.pending); s('s-esc',d.escalations); s('s-brd',d.brds||d.brds_generated);
+  const aEl=document.getElementById('s-auth'); if(aEl){aEl.textContent=d.authenticated?'✓':'✕'; aEl.style.color=d.authenticated?'var(--grn)':'var(--red)';}
+}
+
+async function loadInbox() {
+  try { log('info','Fetching real Gmail inbox...'); const d=await(await fetch(`${API}/api/emails`)).json(); state.emails=d.emails||[]; renderInbox(); updateBadges(); log('ok',`${state.emails.length} unread emails fetched`); }
+  catch(e){ toast('Backend not running','warn'); }
+}
+async function loadCalendar() {
+  try { log('info','Syncing Google Calendar...'); const d=await(await fetch(`${API}/api/calendar/events`)).json(); state.events=d.events||[]; renderCalendar(); toast(`${state.events.length} events loaded`,'ok'); log('ok',`Calendar synced: ${state.events.length} events`); }
+  catch(e){ toast('Calendar sync failed','warn'); }
+}
+async function loadActions() {
+  try { const d=await(await fetch(`${API}/api/actions`)).json(); state.actions=d.actions||[]; renderActions(); renderEsc(); updateBadges(); } catch(e){}
+}
+async function refreshAll() { loadStats(); loadActions(); }
+
+/* ── Approve / reject ── */
+async function approve(id) {
+  const a = state.actions.find(x=>x.id===id);
+  if(!a) return;
+  const draftEl = document.getElementById(`draft-${id}`);
+  const body    = draftEl?.innerText || a.draft_body || '';
+  try {
+    log('info',`Sending real email for: ${a.email?.subject}`);
+    const r = await fetch(`${API}/api/actions/${id}/approve`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({body, subject: a.draft_subject})
+    });
+    const d = await r.json();
+    if(d.status==='sent') { a.status='sent'; renderActions(); updateBadges(); toast('Real email sent!','ok'); }
+  } catch(e){ toast('Send failed','warn'); }
+}
+async function reject(id) {
+  try { await fetch(`${API}/api/actions/${id}/reject`,{method:'POST'}); const a=state.actions.find(x=>x.id===id); if(a)a.status='rejected'; renderActions(); updateBadges(); toast('Rejected','warn'); }
+  catch(e){}
+}
+async function resolveEsc(id) { const a=state.actions.find(x=>x.id===id); if(a)a.status='resolved'; renderEsc(); updateBadges(); toast('Escalation resolved','ok'); }
+async function cancelEvent(id) {
+  try { await fetch(`${API}/api/calendar/events/${id}`,{method:'DELETE'}); state.events=state.events.filter(e=>e.id!==id); renderCalendar(); toast('Event cancelled','warn'); }
+  catch(e){}
+}
+
+/* ── BRD upload ── */
+async function uploadFile(e) {
+  const file = e.target.files[0]; if(!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    log('info',`Uploading ${file.name} for BRD generation...`);
+    const r = await fetch(`${API}/api/brd/from-upload`,{method:'POST',body:fd});
+    const d = await r.json();
+    toast('Processing — BRD generation started','ok');
+    log('ok','BRD pipeline triggered via LangGraph');
+    startBRDProgressAnim();
+  } catch(e){ toast('Backend not running','warn'); demoProgress(); }
+}
+
+async function pasteTx() {
+  const content = document.getElementById('paste-tx').value.trim();
+  if(!content){ toast('Paste some content first','warn'); return; }
+  document.getElementById('tx-spin').style.display='block';
+  const blob = new Blob([content],{type:'text/plain'});
+  const fd = new FormData(); fd.append('file', blob, 'transcript.txt');
+  try {
+    const r = await fetch(`${API}/api/brd/from-upload`,{method:'POST',body:fd});
+    document.getElementById('tx-spin').style.display='none';
+    toast('BRD generation started','ok');
+    startBRDProgressAnim();
+  } catch(e){ document.getElementById('tx-spin').style.display='none'; toast('Backend not running — showing demo','warn'); demoProgress(); }
+}
+
+function handleDrop(e) {
+  e.preventDefault(); document.getElementById('dz').classList.remove('drag');
+  const file = e.dataTransfer.files[0]; if(!file) return;
+  const fakeEv={target:{files:[file]}}; uploadFile(fakeEv);
+}
+
+/* BRD progress animation */
+const BRD_STAGES = ['ingestion','extraction','gap_detection','writing','assembly','docx'];
+function advanceBRDProgress(stage) {
+  const idx = BRD_STAGES.indexOf(stage);
+  BRD_STAGES.forEach((s,i) => {
+    const el = document.getElementById(`ps-${s}`); if(!el) return;
+    const dot=el.querySelector('.ps-d'); const lbl=el.querySelector('.ps-l');
+    if(i < idx){ dot.className='ps-d done'; lbl.className='ps-l done'; }
+    else if(i===idx){ dot.className='ps-d active'; lbl.className='ps-l active'; }
+    else { dot.className='ps-d idle'; lbl.className='ps-l idle'; }
+  });
+}
+function startBRDProgressAnim() {
+  let i=0;
+  const t = setInterval(()=>{ if(i<BRD_STAGES.length){ advanceBRDProgress(BRD_STAGES[i]); i++; } else clearInterval(t); }, 1400);
+}
+function demoProgress() { startBRDProgressAnim(); setTimeout(()=>{ renderBRDPreview(DEMO_BRD_PREVIEW); state.brds['demo']={title:'BRD: Demo Project'}; renderBRD(); updateBadges(); }, 9000); }
+function renderBRDPreview(brd) {
+  const el = document.getElementById('brd-result-preview');
+  el.innerHTML = `<div class="card" style="background:var(--gdim);border-color:rgba(64,192,87,.2)">
+    <div style="font-size:11px;font-weight:500;color:var(--grn);margin-bottom:5px">✓ BRD Generated</div>
+    <div style="font-size:11px;color:var(--tx2)">${brd.title}</div>
+    <div style="font-size:10px;color:var(--tx3);margin-top:4px">${brd.fr} functional requirements · ${brd.nfr} NFRs · ${brd.stakeholders} stakeholders</div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="btn btn-grn btn-sm" onclick="toast('DOCX downloading...','ok')">⬇ Download DOCX</button>
+      <button class="btn btn-g btn-sm" onclick="nav('brd',null)">View BRD →</button>
+    </div>
+  </div>`;
+}
+
+/* ── Renderers ── */
+const IB = {schedule:'b-tl',escalate:'b-rd',status:'b-bl',brd:'b-pu',general:'b-gr',cancel:'b-am',update:'b-bl'};
+const SB = {pending:'b-am',sent:'b-gn',rejected:'b-gr',escalated:'b-rd',resolved:'b-gr'};
+const UC = u => u>=80?'var(--red)':u>=50?'var(--amb)':'var(--grn)';
+const INI = e => (e||'').split('@')[0].slice(0,2).toUpperCase()||'AI';
+const FT = iso => { try{return new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return iso||''} };
+const ib = i => `<span class="badge ${IB[i]||'b-gr'}">${i}</span>`;
+const sb = s => `<span class="badge ${SB[s]||'b-gr'}">${s}</span>`;
+
+function renderDash() {
+  const el=document.getElementById('dash-actions');
+  const pending=state.actions.filter(a=>['pending','escalated'].includes(a.status)).slice(0,5);
+  el.innerHTML = pending.length ? pending.map(a=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onclick="nav('actions',null)">
+      <div class="ac-av" style="width:28px;height:28px;font-size:10px">${INI(a.email?.sender)}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.email?.subject||'—'}</div><div style="font-size:10px;color:var(--tx3)">${a.email?.sender||''}</div></div>
+      ${sb(a.status)}
+    </div>`).join('') : '<div class="empty" style="padding:14px 0"><div style="font-size:20px;opacity:.3">✦</div>No pending actions</div>';
+
+  const evEl=document.getElementById('dash-events');
+  const evs=state.events.slice(0,4);
+  evEl.innerHTML = evs.length ? evs.map(e=>`
+    <div class="ev"><div class="ev-bar" style="background:var(--a)"></div>
+    <div style="flex:1"><div class="ev-title">${e.title||e.summary||'Untitled'}</div><div class="ev-when">${FT(e.start)}</div>${(e.attendees||[]).length?`<div class="ev-who">${(e.attendees||[]).slice(0,2).join(', ')}</div>`:''}</div>
+    ${e.html_link?`<a href="${e.html_link}" target="_blank" class="btn btn-g btn-sm">Open ↗</a>`:''}</div>`).join('') :
+    '<div class="empty" style="padding:12px 0">No upcoming events — sync calendar</div>';
+}
+
+function renderInbox() {
+  const el=document.getElementById('inbox-list');
+  if(!state.emails.length){el.innerHTML='<div class="empty"><div class="ei">✓</div>No unread emails</div>';return;}
+  el.innerHTML=state.emails.map(e=>`
+    <div class="ei" onclick="showEmail('${e.id}')">
+      <div class="ei-dot" style="background:var(--a)"></div>
+      <div style="flex:1;min-width:0"><div class="ei-sub">${e.subject}</div><div class="ei-from">${e.sender}</div><div class="ei-pre">${e.snippet||''}</div></div>
+      <div class="ei-t">${FT(e.received_at||e.date)}</div>
+    </div>`).join('');
+}
+
+function showEmail(id) {
+  const e=state.emails.find(x=>x.id===id); if(!e) return;
+  const el=document.getElementById('email-detail');
+  el.innerHTML=`
+    <div style="font-size:13px;font-weight:500;margin-bottom:3px">${e.subject}</div>
+    <div style="font-size:10px;color:var(--tx2);margin-bottom:2px">From: ${e.sender}</div>
+    <div style="font-size:10px;color:var(--tx3);margin-bottom:12px;font-family:'DM Mono',monospace">${e.date||''}</div>
+    <div style="background:var(--bg3);border-radius:var(--rs);padding:10px;font-size:11px;color:var(--tx2);line-height:1.7;white-space:pre-wrap;max-height:240px;overflow-y:auto">${e.body||e.snippet||'(empty)'}</div>
+    <div style="margin-top:8px;display:flex;gap:6px">
+      <button class="btn btn-a btn-sm" onclick="manualProcess('${e.id}')">⚡ Process with LangGraph</button>
+    </div>`;
+}
+
+async function manualProcess(id) {
+  try { await fetch(`${API}/api/emails/process/${id}`,{method:'POST'}); toast('Processing...','ok'); log('info',`Manual trigger: ${id}`); }
+  catch(e){ toast('Failed','warn'); }
+}
+
+function renderActions() {
+  const el=document.getElementById('actions-list');
+  let list=state.actions;
+  if(actFilter==='pending')   list=list.filter(a=>a.status==='pending');
+  else if(actFilter==='sent') list=list.filter(a=>['sent','approved'].includes(a.status));
+  else if(actFilter==='rejected') list=list.filter(a=>a.status==='rejected');
+
+  if(!list.length){el.innerHTML='<div class="empty"><div class="ei">⚡</div>No actions</div>';return;}
+  el.innerHTML=list.map(a=>{
+    const isEsc=['sent','approved'].includes(a.status);
+    const isSent=isEsc;
+    const isEscalated=a.status==='escalated';
+    return `
+    <div class="ac ${isEscalated?'esc':''} ${isSent?'sent':''}">
+      <div class="ac-h">
+        <div class="ac-av" ${isEscalated?'style="background:var(--rdim);color:var(--red)"':''}>${isEscalated?'▲':INI(a.email?.sender)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="ac-from">${a.email?.sender||'unknown'}</div>
+          <div class="ac-sub">${a.email?.subject||'—'}</div>
+          <div class="ac-meta">${ib(a.intent)}${sb(a.status)}<span style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace">${FT(a.created_at)}</span>
+            <div style="display:flex;align-items:center;gap:4px"><div style="width:36px;height:3px;background:var(--bg5);border-radius:2px;overflow:hidden"><div style="height:100%;width:${a.urgency||0}%;background:${UC(a.urgency||0)}"></div></div><span style="font-size:9px;color:${UC(a.urgency||0)}">${a.urgency||0}</span></div>
+          </div>
+        </div>
+      </div>
+      ${isEscalated?`<div class="ac-body"><div style="background:var(--rdim);border:1px solid rgba(240,62,62,.2);border-radius:var(--rs);padding:9px;font-size:11px;color:var(--red)">▲ Urgency ${a.urgency}/100 — LangGraph escalated. Please respond manually.</div></div><div class="ac-foot"><a href="https://mail.google.com" target="_blank" class="btn btn-a btn-sm">Open Gmail</a><button class="btn btn-g btn-sm" onclick="resolveEsc('${a.id}')">✓ Resolve</button></div>`:''}
+      ${a.draft_body&&!isSent&&!isEscalated?`
+      <div class="ac-body">
+        ${a.calendar_event?`<div style="background:var(--tdim);border:1px solid rgba(0,191,165,.18);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px;font-size:10px"><span style="color:var(--teal);font-weight:500">📅 Meeting:</span> <span style="color:var(--tx2)">${a.calendar_event.title||''} · ${FT(a.calendar_event.start)}</span> <a href="${a.calendar_event.link||'#'}" target="_blank" style="color:var(--teal);margin-left:6px">↗ Calendar</a></div>`:''}
+        ${a.brd_final?`<div style="background:var(--pdim);border:1px solid rgba(168,85,247,.18);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px;font-size:10px"><span style="color:var(--pur);font-weight:500">◈ BRD:</span> <span style="color:var(--tx2)">${a.brd_final.title||''}</span> <button class="btn btn-g btn-sm" style="margin-left:6px" onclick="window.open('${API}/api/brd/${a.brd_job_id}/download')">⬇ DOCX</button></div>`:''}
+        <div style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;margin-bottom:4px">AI DRAFT — CLICK TO EDIT</div>
+        <div class="draft" id="draft-${a.id}" contenteditable="${a.status==='pending'?'true':'false'}">${a.draft_body}</div>
+      </div>
+      <div class="ac-foot">
+        ${a.status==='pending'?`
+        <button class="btn btn-grn btn-sm" onclick="approve('${a.id}')">✓ Send Real Email</button>
+        <button class="btn btn-red btn-sm" onclick="reject('${a.id}')">✕ Reject</button>
+        `:`<span style="font-size:10px;color:var(--tx3)">Status: ${a.status}</span>`}
+      </div>`:a.status!=='escalated'?`<div class="ac-body"><span style="font-size:10px;color:var(--tx3)">Status: ${a.status}</span></div>`:''}
+    </div>`}).join('');
+}
+
+function filterAct(f,el) {
+  actFilter=f;
+  document.querySelectorAll('#page-actions .tab').forEach(t=>t.classList.remove('on'));
+  if(el) el.classList.add('on');
+  renderActions();
+}
+
+function renderEsc() {
+  const el=document.getElementById('esc-list');
+  const escs=state.actions.filter(a=>a.status==='escalated');
+  if(!escs.length){el.innerHTML='<div class="empty"><div class="ei">✓</div>No escalations</div>';return;}
+  el.innerHTML=escs.map(a=>`
+    <div class="ac esc" style="margin-bottom:9px">
+      <div style="padding:12px;display:flex;gap:9px">
+        <div style="font-size:18px;flex-shrink:0">▲</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500;color:var(--red)">${a.email?.subject||'—'}</div>
+          <div style="font-size:10px;color:var(--tx2);margin-top:2px">From: ${a.email?.sender}</div>
+          <div style="margin-top:7px;background:var(--rdim);border-radius:var(--rs);padding:9px;font-size:11px;color:var(--red)">
+            Urgency: <strong>${a.urgency||0}/100</strong> · Sentiment: <strong>${a.sentiment||'urgent'}</strong><br/>
+            LangGraph routed to escalation node — no auto-reply sent
+          </div>
+          <div style="margin-top:8px;background:var(--bg3);border-radius:var(--rs);padding:8px;font-size:10px;color:var(--tx2);max-height:70px;overflow-y:auto">${a.email?.snippet||''}</div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <a href="https://mail.google.com" target="_blank" class="btn btn-a btn-sm">Open Gmail</a>
+            <button class="btn btn-g btn-sm" onclick="resolveEsc('${a.id}')">✓ Resolved</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderBRD() {
+  const el=document.getElementById('brd-list');
+  const brds=Object.entries(state.brds);
+  if(!brds.length){el.innerHTML='<div class="empty"><div class="ei">◈</div>No BRDs yet</div>';return;}
+  el.innerHTML=brds.map(([id,b])=>`
+    <div class="brd-card">
+      <div class="brd-h" onclick="toggleBRDSection('brd-s-${id}')">
+        <div style="width:30px;height:30px;background:var(--pdim);border:1px solid rgba(168,85,247,.2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">◈</div>
+        <div style="flex:1"><div style="font-size:12px;font-weight:500">${b.title||'BRD'}</div><div style="font-size:10px;color:var(--tx3);font-family:'DM Mono',monospace;margin-top:1px">job: ${id}</div></div>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-g btn-sm" onclick="event.stopPropagation();window.open('${API}/api/brd/${id}/download')">⬇ DOCX</button>
+        </div>
+      </div>
+      <div id="brd-s-${id}" style="display:none"><div class="brd-content">Loading...</div></div>
+    </div>`).join('');
+}
+
+async function toggleBRDSection(id) {
+  const el=document.getElementById(id); if(!el) return;
+  if(el.style.display==='block'){el.style.display='none';return;}
+  el.style.display='block';
+  const jobId=id.replace('brd-s-','');
+  try {
+    const d=await(await fetch(`${API}/api/brd/${jobId}/result`)).json();
+    const sec=d.sections||{}; const first=Object.values(sec)[0]||'(empty)';
+    el.querySelector('.brd-content').textContent=first;
+  } catch(e){ el.querySelector('.brd-content').textContent='(backend not running)'; }
+}
+
+function renderCalendar() {
+  const el=document.getElementById('cal-list');
+  if(!state.events.length){el.innerHTML='<div class="empty"><div class="ei">▦</div>No events — click Sync</div>';return;}
+  el.innerHTML=state.events.map(e=>`
+    <div class="ev">
+      <div class="ev-bar" style="background:${e.status==='confirmed'?'var(--teal)':'var(--amb)'}"></div>
+      <div style="flex:1"><div class="ev-title">${e.title||e.summary||'Untitled'}</div><div class="ev-when">${FT(e.start)} → ${FT(e.end)}</div>${(e.attendees||[]).length?`<div class="ev-who">${(e.attendees||[]).slice(0,3).join(', ')}</div>`:''}</div>
+      <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
+        <span class="badge ${e.status==='confirmed'?'b-gn':'b-am'}">${e.status||'confirmed'}</span>
+        ${e.html_link?`<a href="${e.html_link}" target="_blank" class="btn btn-g btn-sm">Open ↗</a>`:''}
+        <button class="btn btn-red btn-sm" onclick="cancelEvent('${e.id}')">Cancel</button>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Utils ── */
+function updateBadges() {
+  const p=state.actions.filter(a=>a.status==='pending').length;
+  const e=state.actions.filter(a=>a.status==='escalated').length;
+  document.getElementById('nb-inbox').textContent  = state.emails.length||0;
+  document.getElementById('nb-actions').textContent= p+e;
+  document.getElementById('nb-esc').textContent     = e;
+  document.getElementById('nb-brd').textContent     = Object.keys(state.brds).length;
+}
+
+function setDot(c,lbl) {
+  const d=document.getElementById('ws-dot'); d.className=`dot dot-${c} ${c==='g'?'pulse':''}`;
+  document.getElementById('ws-lbl').textContent=lbl;
+}
+
+function log(level,msg) {
+  const el=document.getElementById('live-log'); if(!el) return;
+  const t=new Date().toTimeString().slice(0,8);
+  const d=document.createElement('div'); d.className='ll';
+  d.innerHTML=`<span style="color:var(--tx3)">[${t}]</span> <span class="m ${level}">${msg}</span>`;
+  el.appendChild(d); el.scrollTop=el.scrollHeight;
+  while(el.children.length>80) el.removeChild(el.firstChild);
+}
+
+function toast(msg,type='ok') {
+  const el=document.getElementById('toasts');
+  const ic={ok:'✓',warn:'⚠',err:'✕'};
+  const col={ok:'var(--grn)',warn:'var(--amb)',err:'var(--red)'};
+  const t=document.createElement('div'); t.className='toast';
+  t.innerHTML=`<span style="color:${col[type]||col.ok}">${ic[type]||'✓'}</span>${msg}`;
+  el.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='.25s';setTimeout(()=>t.remove(),250)},3200);
+}
+
+function nav(page,el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav-i').forEach(n=>n.classList.remove('on'));
+  document.getElementById(`page-${page}`)?.classList.add('on');
+  if(el) el.classList.add('on');
+  else document.querySelectorAll('.nav-i').forEach(n=>{ if(n.getAttribute('onclick')?.includes(`'${page}'`)) n.classList.add('on'); });
+  const T={dashboard:'Dashboard',inbox:'Inbox',actions:'Actions',escalations:'Escalations',brd:'BRD Documents',
+    'brd-upload':'Upload Transcript',calendar:'Calendar',settings:'Settings',setup:'Setup & Auth'};
+  document.getElementById('tb-title').textContent=T[page]||page;
+  if(page==='calendar') loadCalendar();
+  if(page==='inbox')    loadInbox();
+  if(page==='actions')  { loadActions(); renderActions(); }
+  if(page==='escalations') renderEsc();
+  if(page==='brd')      renderBRD();
+}
+
+function saveSettings() { toast('Settings saved','ok'); }
+
+/* ── Demo BRD data ── */
+const DEMO_BRD_PREVIEW = {title:'BRD: AI Customer Support Chatbot', fr:12, nfr:7, stakeholders:5};
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', ()=>{
+  connectWS(); checkAuth(); loadStats();
+  log('info','NEXUS initialized — LangGraph + Gmail API + Calendar API');
+  log('info','Connecting to backend at localhost:8000...');
+  setInterval(()=>{ loadStats(); updateBadges(); }, 30000);
+});
+</script>
+</body>
+</html>
