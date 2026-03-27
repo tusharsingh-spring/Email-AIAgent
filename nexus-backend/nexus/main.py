@@ -18,6 +18,7 @@ from services.clustering_service import ProjectClusteringAgent
 from services.parsers import MultiModalParsers
 from agents.graph            import run_agent
 import services.db_service as db_service
+from scripts.auto_ingest_pipeline import auto_ingest_loop, scan_once, ingest_status
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +43,7 @@ store = {
     "processed":    set(),   # cache for current session de-duping
     "meetings":     [],      # confirmed calendar events
     "brd_jobs":     {},      # project_id → brd result
+    "brd_running_projects": set(), # track in-flight project BRDs
     "authenticated":False,
     "owner_email":  "",
     "ws_clients":   [],
@@ -304,18 +306,31 @@ async def process_email(email: dict, thread_emails_override: list = None):
     }
 
     # If BRD was generated — save and generate DOCX
+# If BRD was generated — save and generate DOCX
     if result.get("brd_final"):
-        job_id     = str(uuid.uuid4())[:8]
+        job_id = str(uuid.uuid4())[:8]
+        project_id = email.get("project_id")
         
-        # Check if it was a project cluster, write to the specific brd_results folder, else temp
-        if email["id"].startswith("cluster_"):
+        # Check if it was a project cluster or linked to a Supabase project
+        if email["id"].startswith("cluster_") or project_id:
             RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brd_results")
             os.makedirs(RESULTS_DIR, exist_ok=True)
             docx_path = os.path.join(RESULTS_DIR, f"BRD_{job_id}.docx")
         else:
-            docx_path  = os.path.join(tempfile.gettempdir(), f"brd_{job_id}.docx")
+            docx_path = os.path.join(tempfile.gettempdir(), f"brd_{job_id}.docx")
             
         await run_blocking(generate_docx, result["brd_final"], docx_path)
+        if project_id:
+            await broadcast({"type":"brd_stage", "project_id": project_id, "stage": "docx"})
+        
+        # 🟢 NEW: Push the final BRD JSON directly into Supabase if it's tied to a project
+        if project_id:
+            try:
+                db_service.save_brd(project_id, result["brd_final"], str(docx_path))
+                await broadcast({"type":"log", "level":"ok", "msg":f"Saved BRD to Supabase for Project {project_id}"})
+            except Exception as db_err:
+                await broadcast({"type":"log", "level":"error", "msg":f"Supabase BRD save failed: {db_err}"})
+
         action["brd_docx_path"] = docx_path
         action["brd_job_id"]  = job_id
         store["brd_jobs"][job_id] = {
@@ -323,8 +338,7 @@ async def process_email(email: dict, thread_emails_override: list = None):
             "docx_path": docx_path,
             "email_id":  email["id"],
         }
-        await broadcast({"type":"brd_ready","job_id":job_id,
-            "title": result["brd_final"].get("title","BRD")})
+        await broadcast({"type":"brd_ready","job_id":job_id, "title": result["brd_final"].get("title","BRD"), "project_id": project_id})
 
     # If calendar event was created — save it
     if result.get("calendar_event"):
@@ -347,6 +361,10 @@ async def process_email(email: dict, thread_emails_override: list = None):
     await broadcast({"type": msg_type, "payload": action})
     await broadcast({"type":"log","level":"ok" if action["status"]!="escalated" else "error",
         "msg":f"Action Logged: {email.get('subject')} | status={action['status']}"})
+
+    proj_id = email.get("project_id")
+    if proj_id:
+        store["brd_running_projects"].discard(proj_id)
 
     if AUTO_SEND_REPLIES and action["status"] == "pending" and not email["id"].startswith("cluster"):
         try:
@@ -402,6 +420,8 @@ async def lifespan(app: FastAPI):
         print(f"[NEXUS] Warning: Could not preload Cluster Agent: {e}")
         
     asyncio.create_task(email_poll_loop())
+    if os.getenv("AUTO_INGEST_ENABLED", "true").lower() in ("1","true","yes","on"):
+        asyncio.create_task(auto_ingest_loop(broadcast))
     yield
 
 
@@ -702,6 +722,10 @@ async def get_stats():
 async def list_projects():
     return {"projects": db_service.get_projects()}
 
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str):
+    return {"project": db_service.get_project_by_id(project_id)}
+
 @app.post("/api/projects")
 async def add_project(data: dict):
     name = data.get("name", "New Project")
@@ -743,11 +767,28 @@ async def get_proj_context(project_id: str):
     ctx = db_service.get_project_context_details(project_id)
     return ctx
 
+@app.get("/api/projects/{project_id}/emails")
+async def get_project_emails(project_id: str):
+    ctx = db_service.get_project_context_details(project_id)
+    return {"emails": ctx.get("emails", [])}
+
+@app.get("/api/projects/{project_id}/documents")
+async def get_project_documents(project_id: str):
+    ctx = db_service.get_project_context_details(project_id)
+    return {"documents": ctx.get("documents", [])}
+
+@app.get("/api/projects/{project_id}/brd")
+async def get_project_brd(project_id: str):
+    brd = db_service.get_brd_for_project(project_id)
+    return {"brd": brd} if brd else {"error": "Not found"}
+
 @app.post("/api/projects/{project_id}/generate-brd")
 async def generate_project_brd(project_id: str):
     """Trigger the LangGraph agent on the FULL project context collected in the DB."""
     p = db_service.get_project_by_id(project_id)
     if not p: return {"error":"Project not found"}
+    if project_id in store["brd_running_projects"]:
+        return {"status":"already_running","project_id": project_id}
     
     context_str = db_service.get_project_context_string(project_id)
     if not context_str:
@@ -765,6 +806,8 @@ async def generate_project_brd(project_id: str):
     }
     
     await broadcast({"type":"log", "level":"info", "msg":f"Starting Project-Wide AI Extraction for: {p.get('name')}"})
+    store["brd_running_projects"].add(project_id)
+    await broadcast({"type":"brd_stage", "project_id": project_id, "stage": "ingestion"})
     asyncio.create_task(process_email(master_query))
     return {"status":"processing", "project_id": project_id}
 
@@ -854,6 +897,20 @@ async def list_brds():
          "metadata": j["result"].get("metadata",{})}
         for jid, j in store["brd_jobs"].items()
     ]))}
+
+
+# ══════════════════════════════════════════════════════════════
+# INGEST CONTROL
+# ══════════════════════════════════════════════════════════════
+@app.get("/api/ingest/status")
+async def ingest_status_endpoint():
+    return ingest_status()
+
+
+@app.post("/api/ingest/scan")
+async def ingest_scan_now():
+    stats = await scan_once(broadcast)
+    return stats
 
 
 # ══════════════════════════════════════════════════════════════
