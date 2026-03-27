@@ -8,3 +8,5 @@ venv/
 .env
 token.json
 credentials.json
+model.safetensors
+emails.csv

@@ -1,0 +1,119 @@
+import os
+from supabase import create_client, Client
+from typing import List, Dict, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
+
+URL: str = os.getenv("SUPABASE_URL", "")
+KEY: str = os.getenv("SUPABASE_KEY", "")
+
+_supabase: Optional[Client] = None
+
+def get_db() -> Client:
+    global _supabase
+    if _supabase is None:
+        if not URL or not KEY or "YOUR_SUPABASE" in URL:
+            print("[DB] WARNING: Supabase credentials not set in .env. Persistence will fail.")
+            raise RuntimeError("Missing Supabase credentials")
+        _supabase = create_client(URL, KEY)
+    return _supabase
+
+# --- Projects ---
+def create_project(name: str, description: str = "") -> Dict:
+    db = get_db()
+    res = db.table("projects").insert({"name": name, "description": description, "status": "active"}).execute()
+    return res.data[0] if res.data else {}
+
+def get_projects() -> List[Dict]:
+    db = get_db()
+    res = db.table("projects").select("*").order("created_at", desc=True).execute()
+    return res.data or []
+
+def get_project_by_id(project_id: str) -> Dict:
+    db = get_db()
+    res = db.table("projects").select("*").eq("id", project_id).single().execute()
+    return res.data or {}
+
+# --- Emails ---
+def upsert_emails(emails: List[Dict]):
+    """Sync a batch of Gmail messages to the DB."""
+    db = get_db()
+    data = []
+    for em in emails:
+        data.append({
+            "id": em["id"],
+            "thread_id": em.get("thread_id"),
+            "sender": em.get("sender"),
+            "subject": em.get("subject"),
+            "body": em.get("body"),
+            "received_at": em.get("received_at") or em.get("date"),
+            "is_processed": False
+        })
+    if data:
+        return db.table("emails").upsert(data, on_conflict="id").execute()
+
+def get_unassigned_emails() -> List[Dict]:
+    db = get_db()
+    res = db.table("emails").select("*").is_("project_id", "null").order("received_at", desc=True).execute()
+    return res.data or []
+
+def link_email_to_project(email_id: str, project_id: str):
+    db = get_db()
+    db.table("emails").update({"project_id": project_id}).eq("id", email_id).execute()
+
+# --- Documents ---
+def add_document(project_id: str, filename: str, content: str, doc_type: str = "transcript"):
+    db = get_db()
+    res = db.table("documents").insert({
+        "project_id": project_id,
+        "filename": filename,
+        "content": content,
+        "type": doc_type
+    }).execute()
+    return res.data[0] if res.data else {}
+
+def get_project_documents(project_id: str) -> List[Dict]:
+    db = get_db()
+    res = db.table("documents").select("*").eq("project_id", project_id).execute()
+    return res.data or []
+
+# --- BRDs ---
+def save_brd(project_id: str, content: Dict, docx_url: str = ""):
+    db = get_db()
+    db.table("brds").upsert({
+        "project_id": project_id,
+        "content": content,
+        "docx_url": docx_url
+    }, on_conflict="project_id").execute()
+
+def get_brd_for_project(project_id: str) -> Optional[Dict]:
+    db = get_db()
+    res = db.table("brds").select("*").eq("project_id", project_id).execute()
+    return res.data[0] if res.data else None
+
+# --- Context Aggregator for Agent ---
+def get_project_context_details(project_id: str) -> Dict:
+    """Returns structured emails and documents for UI display."""
+    db = get_db()
+    emails = db.table("emails").select("*").eq("project_id", project_id).order("received_at", desc=True).execute().data or []
+    docs = db.table("documents").select("*").eq("project_id", project_id).order("created_at", desc=True).execute().data or []
+    return {"emails": emails, "documents": docs}
+
+def get_project_context_string(project_id: str) -> str:
+    """Aggregates context for AI Agents."""
+    ctx = get_project_context_details(project_id)
+    emails = ctx["emails"]
+    docs = ctx["documents"]
+    
+    parts = []
+    if emails:
+        parts.append("--- PROJECT EMAILS ---")
+        for em in emails:
+            parts.append(f"From: {em['sender']}\nSubject: {em['subject']}\nBody: {em['body'][:2000]}\n")
+    if docs:
+        parts.append("--- PROJECT DOCUMENTS ---")
+        for d in docs:
+            parts.append(f"Source: {d['filename']}\nContent: {d['content'][:5000]}\n")
+            
+    return "\n".join(parts)

@@ -1,18 +1,18 @@
-"""
-NEXUS — LangGraph Multi-Agent Orchestrator
-Agents: Email Watcher → Intent Router → BRD Agent → Calendar Agent → Reply Composer
-"""
-
-import os, json, asyncio, re
+import os, json, asyncio, re, time
 from typing import TypedDict, Annotated, Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+import services.db_service as db_service
 from groq import Groq
 from dotenv import load_dotenv
 load_dotenv()
 MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 ESCALATION_THRESHOLD = int(os.getenv("ESCALATION_THRESHOLD", "70"))
+LOCAL_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "brd_t5_finetuned")
+USE_LOCAL = os.getenv("LOCAL_BRD_MODEL", "false").lower() in ("1", "true", "yes") and os.path.isdir(LOCAL_MODEL_DIR)
 _groq_client = None
+_local_model  = None
+_local_tok    = None
 
 
 def _get_groq_client():
@@ -23,6 +23,51 @@ def _get_groq_client():
             raise RuntimeError("Missing GROQ_API_KEY in environment")
         _groq_client = Groq(api_key=api_key)
     return _groq_client
+
+
+def _get_local_model():
+    """Lazy-load the fine-tuned T5 model from disk (GPU if available)."""
+    global _local_model, _local_tok
+    if _local_model is None:
+        try:
+            import torch
+            from transformers import T5ForConditionalGeneration, T5Tokenizer
+            print(f"[Local LLM] Loading fine-tuned T5 from {LOCAL_MODEL_DIR}")
+            _local_tok   = T5Tokenizer.from_pretrained(LOCAL_MODEL_DIR)
+            _local_model = T5ForConditionalGeneration.from_pretrained(LOCAL_MODEL_DIR)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            _local_model = _local_model.to(device)
+            _local_model.eval()
+            print(f"[Local LLM] T5 loaded on {device}")
+        except Exception as e:
+            print(f"[Local LLM] Failed to load: {e}")
+            _local_model = None
+    return _local_model, _local_tok
+
+
+def _llm_local(system: str, user: str) -> dict | str:
+    """Run a query through the local fine-tuned T5 model."""
+    model, tok = _get_local_model()
+    if model is None:
+        return {}
+    try:
+        import torch
+        prompt = f"{system}\n\n{user[:1000]}"
+        inputs = tok(prompt, return_tensors="pt", max_length=512, truncation=True)
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        with torch.no_grad():
+            out = model.generate(**inputs, max_length=256, num_beams=4, early_stopping=True)
+        text = tok.decode(out[0], skip_special_tokens=True)
+        # Parse key: value structured output from T5
+        result = {}
+        for part in text.split(" | "):
+            if ":" in part:
+                k, _, v = part.partition(":")
+                result[k.strip().replace(" ", "_")] = v.strip()
+        return result if result else text
+    except Exception as e:
+        print(f"[Local LLM] Inference failed: {e}")
+        return {}
 
 
 # ── Shared State (flows through every node) ─────────────────
@@ -36,6 +81,7 @@ class AgentState(TypedDict):
     attachments:     list[dict]      # [{name, content, type}]
     all_thread_emails: list[dict]
     force_intent:     str
+    project_id:       str             # Supabase link for full context retrieval
 
     # Intent parsing
     intent:          str             # email | schedule | cancel | status | brd | escalate | general
@@ -87,18 +133,58 @@ def _parse_json_loose(text: str) -> dict | None:
         return None
 
 
-def _llm(system: str, user: str) -> dict | str:
-    try:
-        client = _get_groq_client()
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role":"system","content":system},{"role":"user","content":user}],
-            temperature=0.1, max_tokens=2000,
-        )
-        raw = (resp.choices[0].message.content or "").strip()
-    except Exception as e:
-        print(f"[LLM] Groq call failed: {e}")
-        return {}
+def _llm(system: str, user: str, max_retries: int = 3) -> dict | str:
+    """
+    Tiered LLM Dispatcher with Resilience:
+    1. Try Groq (Model of choice for quality).
+    2. Retry on 429 (Rate Limit) with exponential backoff.
+    3. Fall back to local T5 only if all else fails.
+    """
+    # 1. Try Groq with backoff
+    for attempt in range(max_retries):
+        try:
+            client = _get_groq_client()
+            resp = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role":"system","content":system},{"role":"user","content":user}],
+                temperature=0.1, max_tokens=2000,
+            )
+            raw = (resp.choices[0].message.content or "").strip()
+            
+            # Cleanup & Parse
+            raw = re.sub(r"```json\n?|\n?```", "", raw).strip()
+            parsed = _parse_json_loose(raw)
+            if parsed is not None:
+                return parsed
+            
+            m = re.search(r"\{.*\}", raw, flags=re.S)
+            if m:
+                parsed = _parse_json_loose(m.group(0))
+                if parsed is not None:
+                    return parsed
+            # Return raw if not JSON but call succeeded
+            return raw
+
+        except Exception as e:
+            err_msg = str(e)
+            print(f"[LLM] Groq attempt {attempt+1} failed: {err_msg[:120]}")
+            
+            # If it's a rate limit (429), sleep and retry
+            if "429" in err_msg or "rate_limit" in err_msg.lower():
+                wait = (2 ** attempt) * 2 # 2s, 4s, 8s...
+                print(f"[LLM] Rate limit hit. Backing off for {wait}s...")
+                time.sleep(wait)
+                continue
+            
+            # For other errors, break and fall back
+            break
+
+    # 2. Final Fallback to local
+    if os.path.isdir(LOCAL_MODEL_DIR):
+        print("[LLM] Falling back to local fine-tuned T5 model after Groq exhaustion...")
+        return _llm_local(system, user)
+    
+    return {}
 
     raw = re.sub(r"```json\n?|\n?```", "", raw).strip()
     parsed = _parse_json_loose(raw)
@@ -235,15 +321,36 @@ Rules:
 # Extracts structured requirements from email + thread context
 # ══════════════════════════════════════════════════════════════
 def brd_extraction_node(state: AgentState) -> AgentState:
-    # Combine current email + thread history
-    all_content = state["body"]
-    for prev in state.get("all_thread_emails", [])[-5:]:
-        all_content += f"\n\n---\nFrom: {prev.get('sender','')}\n{prev.get('body','')[:800]}"
+    # 1. If we have a project_id, pull the DEEP context from Supabase (all past emails + docs)
+    project_id = state.get("project_id")
+    if project_id:
+        print(f"[Agent] Retrieving proper context for Project: {project_id}")
+        all_content = db_service.get_project_context(project_id)
+    else:
+        # Fallback to current email/thread if no project linked yet
+        all_content = state["body"]
+        for prev in state.get("all_thread_emails", [])[-5:]:
+            all_content += f"\n\n---\nFrom: {prev.get('sender','')}\n{prev.get('body','')[:800]}"
 
-    # Also include attachments
+    # 2. Also include any local session attachments
     for att in state.get("attachments", []):
         if att.get("content"):
             all_content += f"\n\n--- ATTACHMENT: {att['name']} ---\n{att['content'][:1500]}"
+
+    # 3. Advanced NLP Pre-processing: Noise Reduction (Enron / AMI filters)
+    def clean_noisy_content(text: str) -> str:
+        import re
+        # Remove Enron header noise (Message-ID, X-To, X-From)
+        text = re.sub(r"(?i)(Message-ID|Date|From|To|Subject|Mime-Version|Content-Type|X-[a-zA-Z-]+):.*?\n", "", text)
+        # Remove transcript filler words (AMI dataset noise)
+        text = re.sub(r"\b(um|uh|like|you know|I mean|yeah|okay|right)\b", "", text, flags=re.IGNORECASE)
+        # Compress multiple newlines
+        return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    cleaned_content = clean_noisy_content(all_content)
+    
+    # 4. Expanded clean context window
+    context_to_process = cleaned_content[:8000]
 
     system = """You are a senior business analyst. Extract ALL requirements from these communications.
 Return ONLY valid JSON:
@@ -266,28 +373,33 @@ Return ONLY valid JSON:
   "feature_priorities": [{"feature":"","priority":"P0|P1|P2","rationale":""}]
 }"""
 
-    result = _llm(system, f"Communications:\n\n{all_content[:5000]}")
+    result = _llm(system, f"Communications:\n\n{context_to_process}")
     if isinstance(result, dict) and result:
         state["brd_extracted"] = result
     else:
-        project_name = (state.get("subject") or "Project").replace("BRD Request:", "").strip()[:80]
+        # DEEP HEURISTIC FALLBACK: If LLM fails, we manually construct a project-specific skeleton
+        # instead of a generic "Recovery" document.
+        print("[Agent] LLM Extraction failed. Using Deep Heuristic Fallback for extraction.")
+        subj = (state.get("subject") or "Project").replace("BRD:", "").strip()[:80]
+        desc = state.get("body", "")[:1000] # Use more body content
+        
         state["brd_extracted"] = {
-            "project_name": project_name or "Project",
-            "project_description": (state.get("body", "")[:240] or "Project requirements collected from communication."),
-            "business_problem": "Business requirements need to be captured and formalized.",
-            "stakeholders": [{"name": state.get("sender","Stakeholder"), "role":"Requester", "needs":"Clear deliverable scope"}],
-            "business_objectives": [{"objective":"Deliver requested solution","metric":"Stakeholder acceptance","priority":"high"}],
-            "scope_in": ["Core requested functionality"],
-            "scope_out": ["Items not explicitly requested"],
-            "functional_requirements": [{"id":"FR-001","title":"Primary workflow","description":"System supports requested workflow.","priority":"high"}],
-            "non_functional_requirements": [{"id":"NFR-001","category":"reliability","requirement":"System should operate reliably under normal load."}],
-            "constraints": ["Timeline and requirements may evolve with clarifications."],
-            "assumptions": ["Provided transcript/email reflects current business need."],
-            "risks": [{"risk":"Ambiguous requirements","impact":"medium","mitigation":"Confirm open questions with stakeholders."}],
-            "timeline": {"start":None,"end":None,"milestones":["Draft BRD", "Review", "Sign-off"]},
-            "success_metrics": ["Business stakeholder approves BRD"],
+            "project_name": subj or "Requirement Document",
+            "project_description": f"Extracted requirements for {subj}. {desc[:200]}...",
+            "business_problem": desc[:300] if len(desc) > 50 else "Capture and document business needs.",
+            "stakeholders": [{"name": state.get("sender","User"), "role":"Stakeholder", "needs":"Documented requirements"}],
+            "business_objectives": [{"objective":"Fulfill requested capabilities","metric":"Success","priority":"high"}],
+            "scope_in": ["Primary requested features"],
+            "scope_out": ["Out of scope items"],
+            "functional_requirements": [{"id":"FR-001","title":"Core Feature","description":"Standard project requirement fulfillment.","priority":"high"}],
+            "non_functional_requirements": [{"id":"NFR-001","category":"reliability","requirement":"System must be stable."}],
+            "constraints": ["Limited by extraction success."],
+            "assumptions": ["Context provided is accurate."],
+            "risks": [{"risk":"Missing details","impact":"high","mitigation":"Human review required."}],
+            "timeline": {"start":None,"end":None,"milestones":["Current Draft"]},
+            "success_metrics": ["Requirement fulfillment"],
             "decisions_made": [],
-            "feature_priorities": [{"feature":"Core requirements implementation","priority":"P0","rationale":"Direct business need"}],
+            "feature_priorities": [{"feature":"Core Business Logic","priority":"P0","rationale":"Base requirement"}],
         }
     return state
 
@@ -315,86 +427,86 @@ Set can_proceed=false only if >3 critical gaps exist."""
 
 
 # ══════════════════════════════════════════════════════════════
-# NODE 4 — BRD Section Writer (parallel sections)
+# NODE 4 & 5 — High-Efficiency BRD Generator (Single Call)
 # ══════════════════════════════════════════════════════════════
+async def _generate_brd_section(project_name: str, section_key: str, section_desc: str, extracted: dict) -> str:
+    """Helper to generate a single BRD section if the master call fails."""
+    system = f"You are a Business Analyst. Write the '{section_key}' section for '{project_name}'. {section_desc}. Return ONLY the text content."
+    user = f"Context: {json.dumps(extracted, indent=2)[:3000]}"
+    res = await asyncio.get_event_loop().run_in_executor(None, _llm, system, user)
+    return str(res) if res else "Context unavailable for this section."
+
 async def brd_writer_node(state: AgentState) -> AgentState:
+    """
+    High-Efficiency BRD Generator.
+    Tries a single efficient call first, falls back to section-by-section if needed.
+    """
     extracted = state.get("brd_extracted", {})
-    ctx = json.dumps(extracted, indent=2)[:3000]
+    project_name = extracted.get("project_name", state.get("subject", "Project")).replace("BRD:", "").strip()
+    
+    ctx = json.dumps(extracted, indent=2)[:4000]
 
-    SECTION_PROMPTS = {
-        "executive_summary": "Write a professional Executive Summary (2-3 paragraphs) for a BRD. Business language. No JSON.",
-        "business_objectives": "Write the Business Objectives section. Numbered list, each with metric. No JSON.",
-        "scope": "Write the Project Scope section: In Scope bullet list, Out of Scope bullet list, Assumptions. No JSON.",
-        "functional_requirements": "Write Functional Requirements. Format: FR-XXX title, Description, Priority, Acceptance Criteria. No JSON.",
-        "non_functional_requirements": "Write Non-Functional Requirements grouped by Performance, Security, Scalability, Reliability. Measurable. No JSON.",
-        "stakeholders_decisions": "Write Stakeholders section (roles, interests) AND Key Decisions Made section. No JSON.",
-        "risks_constraints": "Write Risks table (Risk | Impact | Probability | Mitigation), Constraints list, Dependencies list. No JSON.",
-        "feature_prioritization": "Write Feature Prioritization section. P0/P1/P2 tiers with rationale. No JSON.",
-        "timeline_milestones": "Write Timeline & Milestones. Use [TBD] for unknown dates. No JSON.",
+    system = f"""You are a Lead Business Analyst. Create a FINAL Business Requirements Document for '{project_name}'.
+Return ONLY valid JSON with this EXACT structure:
+{{
+  "title": "BRD: {project_name}",
+  "version": "1.0",
+  "status": "Draft",
+  "sections": {{
+    "executive_summary": "High-level overview...",
+    "business_objectives": "3-5 SMART goals...",
+    "scope": "In-Scope, Out-of-Scope, Assumptions...",
+    "functional_requirements": "FR table...",
+    "non_functional_requirements": "Performance, Security...",
+    "stakeholders_decisions": "Stakeholders list...",
+    "risks_constraints": "Risk matrix...",
+    "feature_prioritization": "MoSCoW...",
+    "timeline_milestones": "Milestones..."
+  }},
+  "metadata": {{ "project_name": "{project_name}" }}
+}}"""
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _llm, system, f"Extracted Requirements:\n{ctx}")
+    
+    if isinstance(result, dict) and result.get("sections"):
+        state["brd_final"] = result
+        state["brd_sections"] = result["sections"]
+        return state
+
+    # --- LAYER 2 FALLBACK: Section-by-Section ---
+    print(f"[LLM] Primary BRD call failed for {project_name}. Falling back to Section-by-Section generation...")
+    sections_schema = {
+        "executive_summary": "Summarize the project vision and problem being solved",
+        "business_objectives": "List 3-5 specific business goals",
+        "scope": "Define what is in and out of scope",
+        "functional_requirements": "Detail the specific features and user stories",
+        "non_functional_requirements": "Specify performance, security, and quality needs",
+        "stakeholders_decisions": "Identify key people and technical decisions",
+        "risks_constraints": "List potential blockers and risks",
+        "feature_prioritization": "Rank features by business value",
+        "timeline_milestones": "Propose a high-level delivery schedule"
     }
+    
+    final_sections = {}
+    for key, desc in sections_schema.items():
+        # Generate each section individually to stay under token limits / prevent JSON parsing bombs
+        final_sections[key] = await _generate_brd_section(project_name, key, desc, extracted)
+        await asyncio.sleep(0.5) # Slight pause to avoid hitting rate limits between chunks
 
-    async def write_section(key: str, prompt: str) -> tuple[str, str]:
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _llm, prompt, f"Project data:\n{ctx}")
-        return key, result if isinstance(result, str) else json.dumps(result)
-
-    tasks = [write_section(k, v) for k, v in SECTION_PROMPTS.items()]
-    results = await asyncio.gather(*tasks)
-    state["brd_sections"] = dict(results)
+    state["brd_sections"] = final_sections
+    state["brd_final"] = {
+        "title": f"BRD: {project_name}",
+        "version": "1.0",
+        "status": "Advanced Draft",
+        "sections": final_sections,
+        "metadata": {"project_name": project_name, "is_fragmented_recovery": True}
+    }
     return state
 
 
-# ══════════════════════════════════════════════════════════════
-# NODE 5 — BRD Assembler
-# ══════════════════════════════════════════════════════════════
 def brd_assembler_node(state: AgentState) -> AgentState:
-    sections = state.get("brd_sections", {})
-    extracted = state.get("brd_extracted", {})
-
-    system = """Assemble a final BRD from drafted sections. Ensure consistency, remove duplication, fix requirement IDs.
-Return ONLY valid JSON:
-{
-  "title": "BRD: [project]",
-  "version": "1.0",
-  "status": "Draft",
-  "sections": {
-    "executive_summary": "text",
-    "business_objectives": "text",
-    "scope": "text",
-    "functional_requirements": "text",
-    "non_functional_requirements": "text",
-    "stakeholders_decisions": "text",
-    "risks_constraints": "text",
-    "feature_prioritization": "text",
-    "timeline_milestones": "text"
-  },
-  "metadata": {"project_name":"","total_fr":0,"total_nfr":0,"high_priority":0}
-}"""
-
-    sections_text = "\n\n".join(f"=== {k} ===\n{v}" for k, v in sections.items())
-    result = _llm(system, f"Sections:\n{sections_text[:6000]}")
-
-    if isinstance(result, dict) and result:
-        state["brd_final"] = result
-    else:
-        project_name = extracted.get("project_name", "Project")
-        state["brd_final"] = {
-            "title": f"BRD: {project_name}",
-            "version": "1.0",
-            "status": "Draft",
-            "sections": {
-                "executive_summary": sections.get("executive_summary", f"This BRD captures requirements for {project_name}."),
-                "business_objectives": sections.get("business_objectives", "1. Deliver requested capabilities\n2. Improve process outcomes"),
-                "scope": sections.get("scope", "In Scope:\n- Requested business functionality\n\nOut of Scope:\n- Unspecified features"),
-                "functional_requirements": sections.get("functional_requirements", "FR-001 Core workflow\nDescription: Support requested process\nPriority: High"),
-                "non_functional_requirements": sections.get("non_functional_requirements", "Reliability: Stable operation\nSecurity: Protect business data"),
-                "stakeholders_decisions": sections.get("stakeholders_decisions", "Stakeholders: Requester and delivery team"),
-                "risks_constraints": sections.get("risks_constraints", "Risk: Requirement ambiguity\nMitigation: Clarification checkpoints"),
-                "feature_prioritization": sections.get("feature_prioritization", "P0: Core requested capabilities"),
-                "timeline_milestones": sections.get("timeline_milestones", "Milestones: Draft -> Review -> Sign-off"),
-            },
-            "metadata": {"project_name": project_name, "total_fr": 1, "total_nfr": 1, "high_priority": 1},
-        }
+    """Now a pass-through because writer handles everything."""
     return state
 
 

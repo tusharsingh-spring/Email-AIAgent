@@ -17,6 +17,7 @@ CREDS_FILE   = os.getenv("GOOGLE_CREDS_FILE", "credentials.json")
 TOKEN_FILE   = os.getenv("TOKEN_FILE", "token.json")
 REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8000/auth/callback")
 _oauth_state = None
+_pkce_by_state: dict[str, str] = {}
 
 
 def _load_client_config() -> tuple[str, dict]:
@@ -63,14 +64,21 @@ def get_auth_url() -> str:
     flow = _build_flow(SCOPES)
     flow.redirect_uri = _resolve_redirect_uri()
     # Keep the request minimal to avoid strict parameter validation failures.
-    url, _ = flow.authorization_url(access_type="offline", prompt="consent")
-    _oauth_state = _
+    url, state = flow.authorization_url(access_type="offline", prompt="consent")
+    _oauth_state = state
+    # Persist PKCE verifier for callback token exchange.
+    if state and getattr(flow, "code_verifier", None):
+        _pkce_by_state[state] = flow.code_verifier
     return url
 
 
 def exchange_code(code: str, state: str | None = None) -> Credentials:
-    flow = _build_flow(SCOPES, state=state or _oauth_state)
+    resolved_state = state or _oauth_state
+    flow = _build_flow(SCOPES, state=resolved_state)
     flow.redirect_uri = _resolve_redirect_uri()
+    verifier = _pkce_by_state.pop(resolved_state, None) if resolved_state else None
+    if verifier:
+        flow.code_verifier = verifier
     flow.fetch_token(code=code)
     return flow.credentials
 

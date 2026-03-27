@@ -14,22 +14,41 @@ from services.google_auth    import get_auth_url, exchange_code, save_credential
 from services.gmail_service  import fetch_unread_emails, send_email, mark_read, fetch_thread_emails, get_owner_email, GmailRateLimitError
 from services.calendar_service import get_upcoming_events, delete_event
 from services.docx_generator import generate_docx
+from services.clustering_service import ProjectClusteringAgent
+from services.parsers import MultiModalParsers
 from agents.graph            import run_agent
+import services.db_service as db_service
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# 1. Create the app instance FIRST
+app = FastAPI(title="NEXUS Backend")
+
+# 2. Then add middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],            # For development – restrict later
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. Then your routes, WebSocket, etc.
 
 # ── In-memory state ────────────────────────────────────────
 store = {
-    "actions":      [],      # pending + completed agent actions
-    "processed":    set(),   # de-duped email IDs
+    "actions":      [],      # agent actions (linked to projects in DB)
+    "processed":    set(),   # cache for current session de-duping
     "meetings":     [],      # confirmed calendar events
-    "brd_jobs":     {},      # job_id → brd result
+    "brd_jobs":     {},      # project_id → brd result
     "authenticated":False,
     "owner_email":  "",
     "ws_clients":   [],
     "summaries":    [],
-    "latest_emails": [],
+    "cluster_agent": None,
 }
-MAX_EMAIL_FETCH = int(os.getenv("MAX_EMAIL_FETCH", "30"))
+MAX_EMAIL_FETCH = int(os.getenv("MAX_EMAIL_FETCH", "5"))
 AUTO_SEND_REPLIES = os.getenv("AUTO_SEND_REPLIES", "true").lower() in ("1", "true", "yes", "on")
 
 BUSINESS_DOMAIN_ALLOWLIST = {
@@ -102,6 +121,8 @@ async def email_poll_loop():
                 emails = await run_blocking(
                     fetch_unread_emails, creds, MAX_EMAIL_FETCH
                 )
+                
+                valid_batch_to_process = []
                 for email in emails:
                     if email["id"] in store["processed"]:
                         continue
@@ -111,8 +132,16 @@ async def email_poll_loop():
                         await broadcast({"type":"log","level":"info",
                             "msg":f"Skipped email ({reason}): {email.get('subject','(no subject)')}"})
                         continue
-                    store["processed"].add(email["id"])
-                    asyncio.create_task(process_email(email))
+                        
+                    email["received_at"] = email.get("date")
+                    db_service.upsert_emails([email]) # Persist immediately
+                    valid_batch_to_process.append(email)
+                
+                # Intelligent Batching: If we found valid business emails, 
+                # hand them entirely to the PyTorch Cluster Agent to find Project correlations!
+                if valid_batch_to_process:
+                     asyncio.create_task(process_cluster_batch(valid_batch_to_process))
+                     
         except GmailRateLimitError as e:
             sleep_seconds = min(max(e.retry_after_seconds, 30), 900)
             print(f"[NEXUS] Gmail rate-limited. Backing off for {sleep_seconds}s")
@@ -123,15 +152,91 @@ async def email_poll_loop():
         await asyncio.sleep(sleep_seconds)
 
 
-async def process_email(email: dict):
-    """Run LangGraph agent on one real email, then broadcast result."""
+async def process_cluster_batch(emails: list[dict]):
+    """
+    Core Intelligence Layer: Parses a batch of noise, clusters by semantic project meaning, 
+    and forces the outputs together before running the LangGraph Agent pipeline.
+    This limits API tokens by merging 5 separate emails into 1 cohesive "Project Bucket"!
+    """
+    await broadcast({"type":"log", "level":"info", "msg":f"Aggregating {len(emails)} live emails into ML Project Clustering Engine..."})
+    
+    # 1. Parse into standardized format
+    parsed_docs = []
+    for em in emails:
+        raw_text = f"Subject: {em.get('subject', '')}\nFrom: {em.get('sender', '')}\n\n{em.get('body', '')}"
+        parsed = MultiModalParsers.parse_enron_email(raw_text, doc_id=em['id'])
+        # Bind the original dict so we can still auto-reply if needed
+        parsed['metadata']['original_dict'] = em 
+        parsed_docs.append(parsed)
+
+    # 2. Cluster mathematically!
+    try:
+        agent = store.get("cluster_agent")
+        if agent is None:
+            agent = ProjectClusteringAgent(distance_threshold=0.75)  # loosened from 0.60 to catch more variations
+            store["cluster_agent"] = agent
+            
+        cluster_buckets = agent.cluster_documents(parsed_docs)
+    except Exception as e:
+        await broadcast({"type":"log", "level":"error", "msg":f"ML Clustering error: {e}"})
+        # Fallback to single emails in one massive cluster if Torch blew up
+        cluster_buckets = {0: parsed_docs}
+        
+    await broadcast({"type":"log", "level":"info", "msg":f"Successfully isolated {len(cluster_buckets)} distinct projects from inbox batch."})
+
+    # 3. Fire pipelines for each Project Cluster
+    for cluster_id, docs in cluster_buckets.items():
+        theme = ProjectClusteringAgent.identify_cluster_theme(docs)
+        await broadcast({"type":"log", "level":"info", "msg":f"AI identified Cluster: {theme} ({len(docs)} emails) — awaiting human approval."})
+        
+        # Merge unified project data
+        composite_body = "\n\n---\n\n".join([f"EMAIL REF:\n{d['clean_text']}" for d in docs])
+        
+        # Create a proxy 'email' object representing the entire Project Bucket
+        mock_cluster_email = {
+            "id": f"cluster_{uuid.uuid4().hex[:8]}",
+            "thread_id": f"thread_cluster_{cluster_id}",
+            "sender": "Project Grouping (AI)",
+            "subject": f"Project Cluster: {theme} ({len(docs)} emails)",
+            "body": composite_body,
+            "snippet": f"This cluster contains {len(docs)} emails. Approve to generate a unified BRD.",
+            "attachments": [],
+            "force_intent": "brd",
+            "cluster_raw_emails": [d['metadata']['original_dict'] for d in docs]
+        }
+        
+        # Instead of auto-running run_agent(), we push a Pending Cluster to the dashboard!
+        action = {
+            "id":          mock_cluster_email["id"],
+            "thread_id":   mock_cluster_email["thread_id"],
+            "project_name": theme, # Suggested name
+            "email_ids":   [d['doc_id'] for d in docs], # IDs to link on approve
+            "email":       mock_cluster_email,
+            "intent":      "brd",
+            "urgency":     45,
+            "sentiment":   "neutral",
+            "status":      "pending_cluster", # Custom HITL status
+            "section":     "brd",
+            "summary":     f"AI Clustered {len(docs)} related emails into Project: {theme}",
+            "draft_body":  "Pending human approval to trigger BRD Extractor...",
+            "created_at":  datetime.utcnow().isoformat()
+        }
+        
+        store["actions"].insert(0, action)
+        await broadcast({"type": "new_action", "payload": action})
+        await broadcast({"type":"log", "level":"warn", "msg":f"Cluster '{theme}' sent to UI for human approval."})
+
+async def process_email(email: dict, thread_emails_override: list = None):
+    """Run LangGraph agent on one cohesive simulated or real email, then broadcast result."""
     await broadcast({"type":"log","level":"info",
-        "msg":f"Processing: {email.get('subject', '(no subject)')} from {email.get('sender', 'unknown')}"})
+        "msg":f"LLM Processing: {email.get('subject', '(no subject)')}"})
 
     try:
         creds = load_credentials()
-        thread_emails = []
-        if creds and email.get("thread_id"):
+        thread_emails = thread_emails_override or []
+        
+        # Only fetch real threads if this isn't a mock cluster and has a thread_id
+        if creds and email.get("thread_id") and not thread_emails_override and not email["id"].startswith("cluster"):
             try:
                 thread_emails = await run_blocking(
                     fetch_thread_emails, creds, email["thread_id"]
@@ -144,6 +249,8 @@ async def process_email(email: dict):
         result = await run_agent(email, thread_emails)
     except Exception as e:
         # Keep pipeline alive even when LLM/API fails.
+        import traceback
+        traceback.print_exc()
         fallback_subject = email.get("subject", "(no subject)")
         result = {
             "intent": "general",
@@ -170,7 +277,7 @@ async def process_email(email: dict):
 
     urgency = max(0, min(int(urgency or 0), 100))
 
-    if not is_business_email:
+    if not is_business_email and not email["id"].startswith("cluster"):
         await broadcast({"type":"log","level":"info",
             "msg":f"Skipped non-business email: {email.get('subject','(no subject)')}"})
         return
@@ -199,7 +306,15 @@ async def process_email(email: dict):
     # If BRD was generated — save and generate DOCX
     if result.get("brd_final"):
         job_id     = str(uuid.uuid4())[:8]
-        docx_path  = os.path.join(tempfile.gettempdir(), f"brd_{job_id}.docx")
+        
+        # Check if it was a project cluster, write to the specific brd_results folder, else temp
+        if email["id"].startswith("cluster_"):
+            RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brd_results")
+            os.makedirs(RESULTS_DIR, exist_ok=True)
+            docx_path = os.path.join(RESULTS_DIR, f"BRD_{job_id}.docx")
+        else:
+            docx_path  = os.path.join(tempfile.gettempdir(), f"brd_{job_id}.docx")
+            
         await run_blocking(generate_docx, result["brd_final"], docx_path)
         action["brd_docx_path"] = docx_path
         action["brd_job_id"]  = job_id
@@ -231,9 +346,9 @@ async def process_email(email: dict):
     msg_type = "escalation" if action["status"]=="escalated" else "new_action"
     await broadcast({"type": msg_type, "payload": action})
     await broadcast({"type":"log","level":"ok" if action["status"]!="escalated" else "error",
-        "msg":f"Intent: {intent.upper()} | urgency={urgency} | status={action['status']}"})
+        "msg":f"Action Logged: {email.get('subject')} | status={action['status']}"})
 
-    if AUTO_SEND_REPLIES and action["status"] == "pending":
+    if AUTO_SEND_REPLIES and action["status"] == "pending" and not email["id"].startswith("cluster"):
         try:
             send_result = await _send_action_email(action, {})
             if send_result.get("status") == "sent":
@@ -277,6 +392,15 @@ async def _send_action_email(action: dict, body: dict):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Preload the 90MB PyTorch Engine on startup instead of mid-poll!
+    print("[NEXUS] Booting PyTorch Clustering Engine gracefully... 🤖")
+    try:
+        agent = ProjectClusteringAgent(distance_threshold=0.6)
+        store["cluster_agent"] = agent
+        print("[NEXUS] PyTorch Clustering Agent Loaded.")
+    except Exception as e:
+        print(f"[NEXUS] Warning: Could not preload Cluster Agent: {e}")
+        
     asyncio.create_task(email_poll_loop())
     yield
 
@@ -300,18 +424,19 @@ async def auth_login():
 
 @app.get("/auth/callback")
 async def auth_callback(code: str, state: str | None = None):
+    from fastapi.responses import RedirectResponse
     try:
         creds = exchange_code(code, state=state)
         save_credentials(creds)
         store["authenticated"] = True
-        store["owner_email"]   = get_owner_email(creds)
-        await broadcast({"type":"auth","status":"ok","email":store["owner_email"]})
-        return HTMLResponse("""<html><body style="background:#07080d;color:#dde0ef;
-        font-family:sans-serif;display:flex;align-items:center;justify-content:center;
-        height:100vh;margin:0;text-align:center">
-        <div><div style="font-size:48px">✓</div><h2>Connected to Google!</h2>
-        <p style="color:#8890a8">NEXUS now has real Gmail + Calendar access.</p>
-        <p style="color:#8890a8">You can close this tab.</p></div></body></html>""")
+        try:
+            store["owner_email"] = get_owner_email(creds)
+        except Exception:
+            pass
+        # Broadcast to any open WS tabs, then redirect the callback tab back to dashboard
+        await broadcast({"type": "auth", "status": "ok", "email": store["owner_email"]})
+        # Redirect user back to dashboard — page will reload and checkAuth() will see token.json
+        return RedirectResponse(url="/?auth=success")
     except Exception as e:
         return HTMLResponse(f"""<html><body style="background:#07080d;color:#dde0ef;
         font-family:sans-serif;display:flex;align-items:center;justify-content:center;
@@ -324,8 +449,15 @@ async def auth_callback(code: str, state: str | None = None):
 @app.get("/auth/status")
 async def auth_status():
     creds = load_credentials()
+    # Also ensure store has owner_email populated for WS init messages
+    if creds and not store.get("owner_email"):
+        try:
+            store["owner_email"] = get_owner_email(creds)
+            store["authenticated"] = True
+        except Exception:
+            pass
     return {"authenticated": creds is not None,
-            "email": store.get("owner_email","")}
+            "email": store.get("owner_email", "")}
 
 
 # ══════════════════════════════════════════════════════════════
@@ -352,11 +484,39 @@ async def manual_process(email_id: str):
     email = next((e for e in store.get("latest_emails", []) if e.get("id")==email_id), None)
     if not email:
         return {"error":"Email not loaded in current inbox view. Click Fetch first, then process."}
-    ok, reason = should_process_business_email(email)
-    if not ok:
-        return {"error":f"Email blocked by business filter ({reason})."}
+    
+    # Bypass filters for manual processing
     asyncio.create_task(process_email(email))
     return {"status":"processing","email_id":email_id}
+
+from pydantic import BaseModel
+class ClusterRequest(BaseModel):
+    email_ids: list[str]
+    title: str = ""
+
+@app.post("/api/emails/cluster-manual")
+async def manual_group_process(req: ClusterRequest):
+    """Bypass PyTorch ML and force specific emails into a User-Defined Project Cluster."""
+    selected_emails = [e for e in store.get("latest_emails", []) if e.get("id") in req.email_ids]
+    if not selected_emails:
+        return {"error": "No matching emails found in current inbox batch. Fetch first."}
+    
+    title = req.title or "User Override Cluster"
+    composite_body = "\n\n---\n\n".join([f"EMAIL REF:\nSubject: {d['subject']}\n{d.get('body','')}" for d in selected_emails])
+    
+    mock_cluster_email = {
+        "id": f"cluster_{uuid.uuid4().hex[:8]}",
+        "thread_id": f"thread_user_{uuid.uuid4().hex[:4]}",
+        "sender": "Manual Selection (User)",
+        "subject": f"Overrides: {title} ({len(selected_emails)} emails)",
+        "body": composite_body,
+        "attachments": [],
+        "force_intent": "brd",
+    }
+    
+    await broadcast({"type":"log", "level":"warn", "msg":f"USER OVERRIDE: Forcing LangGraph extraction on {len(selected_emails)} emails directly!"})
+    asyncio.create_task(process_email(mock_cluster_email, thread_emails_override=selected_emails))
+    return {"status": "processing", "message": "Manual override triggered directly to LangGraph"}
 
 
 # ══════════════════════════════════════════════════════════════
@@ -391,6 +551,33 @@ async def list_actions_by_sections():
 async def approve_action(action_id: str, body: dict = {}):
     action = next((a for a in store["actions"] if a["id"]==action_id), None)
     if not action: return {"error":"Not found"}
+    
+    # If this is a pending cluster approval, trigger the BRD agent!
+    if action["status"] == "pending_cluster":
+        action["status"] = "processing_brd"
+        await broadcast({"type":"action_update", "id":action_id, "status":"processing_brd"})
+        
+        # 1. Create the persistent project in Supabase
+        proj_name = action.get("project_name", "New Project")
+        p = db_service.create_project(proj_name, action["summary"])
+        project_id = p.get("id")
+        
+        # 2. Link all emails to this project
+        email_ids = action.get("email_ids", [])
+        for eid in email_ids:
+            db_service.link_email_to_project(eid, project_id)
+            
+        await broadcast({"type":"log", "level":"ok", "msg":f"Project '{proj_name}' created (ID: {project_id}). Emails linked."})
+        await broadcast({"type":"log", "level":"warn", "msg":f"Human Approved Cluster! Firing BRD Extractor..."})
+        
+        # 3. Fire background task with project context
+        mock_email = action["email"]
+        mock_email["project_id"] = project_id # Pass this down to the graph
+        
+        thread_emails = action["email"].pop("cluster_raw_emails", [])
+        asyncio.create_task(process_email(mock_email, thread_emails_override=thread_emails))
+        return {"status": "processing_brd", "project_id": project_id}
+        
     result = await _send_action_email(action, body or {})
     if result.get("error"):
         return result
@@ -418,22 +605,68 @@ async def edit_draft(action_id: str, body: dict):
 @app.get("/api/stats")
 async def get_stats():
     creds = load_credentials()
+    cluster_actions = [a for a in store["actions"] if a.get("status") == "pending_cluster"]
+    unassigned = db_service.get_unassigned_emails()
+    projects = db_service.get_projects()
+    
     return {
-        "processed":     len(store["processed"]),
-        "meetings":      len(store["meetings"]),
-        "escalations":   len([a for a in store["actions"] if a["status"]=="escalated"]),
-        "pending":       len([a for a in store["actions"] if a["status"]=="pending"]),
-        "brds_generated":len(store["brd_jobs"]),
-        "authenticated": creds is not None,
-        "owner_email":   store.get("owner_email",""),
-        "auto_send":     AUTO_SEND_REPLIES,
+        "processed":       len(store["processed"]),
+        "unassigned_emails": len(unassigned),
+        "total_projects":  len(projects),
+        "meetings":        len(store["meetings"]),
+        "escalations":     len([a for a in store["actions"] if a["status"]=="escalated"]),
+        "pending":         len([a for a in store["actions"] if a["status"]=="pending"]),
+        "pending_clusters": len(cluster_actions),
+        "brds_generated":  len(store["brd_jobs"]),
+        "authenticated":   creds is not None,
+        "owner_email":     store.get("owner_email",""),
+        "auto_send":       AUTO_SEND_REPLIES,
+    }
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Detailed pipeline metrics for the evaluation dashboard and judges."""
+    all_actions = store["actions"]
+    by_intent   = {}
+    by_status   = {}
+    for a in all_actions:
+        intent = a.get("intent", "unknown")
+        status = a.get("status", "unknown")
+        by_intent[intent] = by_intent.get(intent, 0) + 1
+        by_status[status] = by_status.get(status, 0) + 1
+    
+    brds = store["brd_jobs"]
+    return {
+        "summary": {
+            "total_emails_processed": len(store["processed"]),
+            "total_actions_created":  len(all_actions),
+            "total_brds_generated":   len(brds),
+            "total_meetings_created": len(store["meetings"]),
+            "total_escalations":      by_status.get("escalated", 0),
+            "pending_cluster_approvals": by_status.get("pending_cluster", 0),
+        },
+        "intent_breakdown":  by_intent,
+        "status_breakdown":  by_status,
+        "brd_titles": [j["result"].get("title", "BRD") for j in brds.values()][:10],
+        "recent_activity": store["summaries"][:20],
+        "pipeline": {
+            "langgraph_nodes": ["intent_router", "brd_extract", "brd_gap_detect", "brd_writer", "brd_assembler", "calendar_agent", "reply_composer", "escalation"],
+            "clustering_model": "sentence-transformers/all-MiniLM-L6-v2",
+            "llm_model":        os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            "llm_provider":     "Groq",
+        }
     }
 
 @app.get("/api/summary")
 async def get_summary():
+    unassigned = db_service.get_unassigned_emails()
+    projects = db_service.get_projects()
+    
     return {
         "overview": {
             "processed": len(store["processed"]),
+            "unassigned_inbox": len(unassigned),
+            "projects_active": len(projects),
             "actions": len(store["actions"]),
             "escalations": len([a for a in store["actions"] if a["status"]=="escalated"]),
             "brds_generated": len(store["brd_jobs"]),
@@ -442,6 +675,98 @@ async def get_summary():
         },
         "recent": store["summaries"][:100],
     }
+
+
+@app.get("/api/stats")
+async def get_stats():
+    unassigned = db_service.get_unassigned_emails()
+    projects = db_service.get_projects()
+    
+    return {
+        "processed": len(store["processed"]),
+        "unassigned_emails": len(unassigned),
+        "total_projects": len(projects),
+        "pending": len([a for a in store["actions"] if a["status"]=="pending"]),
+        "pending_clusters": len([a for a in store["actions"] if a["status"]=="pending_cluster"]),
+        "escalations": len([a for a in store["actions"] if a["status"]=="escalated"]),
+        "brds_generated": len(store["brd_jobs"]),
+        "meetings": len(store["meetings"]),
+        "authenticated": True if load_credentials() else False
+    }
+
+
+# ══════════════════════════════════════════════════════════════
+# PROJECTS & PERSISTENCE (SUPABASE)
+# ══════════════════════════════════════════════════════════════
+@app.get("/api/projects")
+async def list_projects():
+    return {"projects": db_service.get_projects()}
+
+@app.post("/api/projects")
+async def add_project(data: dict):
+    name = data.get("name", "New Project")
+    desc = data.get("description", "")
+    p = db_service.create_project(name, desc)
+    await broadcast({"type":"log","level":"ok","msg":f"Project '{name}' created in DB."})
+    return p
+
+@app.get("/api/emails/unassigned")
+async def get_unassigned():
+    return {"emails": db_service.get_unassigned_emails()}
+
+@app.post("/api/projects/{project_id}/assign-email")
+@app.post("/api/projects/{project_id}/attach_email")
+async def assign_email(project_id: str, data: dict):
+    email_id = data.get("email_id")
+    if not email_id: return {"error":"Missing email_id"}
+    db_service.link_email_to_project(email_id, project_id)
+    await broadcast({"type":"log","level":"info","msg":f"Email linked to project {project_id}"})
+    return {"status":"linked"}
+
+@app.post("/api/projects/{project_id}/upload-doc")
+async def upload_project_doc(project_id: str, file: UploadFile = File(...)):
+    """Upload a transcript/PDF directly to a project bucket."""
+    content = await file.read()
+    # Parse content using MultiModalParsers
+    parsed_text = MultiModalParsers.dispatch(content, file.filename)
+    
+    # Auto-detect type from extension
+    ext = file.filename.split(".")[-1].lower()
+    doc_type = "pdf" if ext == "pdf" else "transcript"
+    
+    doc = db_service.add_document(project_id, file.filename, parsed_text, doc_type)
+    await broadcast({"type":"log","level":"ok","msg":f"Document '{file.filename}' added to project."})
+    return doc
+
+@app.get("/api/projects/{project_id}/context")
+async def get_proj_context(project_id: str):
+    ctx = db_service.get_project_context_details(project_id)
+    return ctx
+
+@app.post("/api/projects/{project_id}/generate-brd")
+async def generate_project_brd(project_id: str):
+    """Trigger the LangGraph agent on the FULL project context collected in the DB."""
+    p = db_service.get_project_by_id(project_id)
+    if not p: return {"error":"Project not found"}
+    
+    context_str = db_service.get_project_context_string(project_id)
+    if not context_str:
+        return {"error": "Project context is empty. Link some emails or upload documents first."}
+    
+    # Create a simulated 'super email' that represents the project context
+    master_query = {
+        "id": f"proj_{project_id[:8]}",
+        "thread_id": f"proj_{project_id[:8]}",
+        "sender": "Project Context (DB)",
+        "subject": f"Project BRD Generation: {p.get('name')}",
+        "body": context_str,
+        "project_id": project_id, # Very important: links result back to project
+        "force_intent": "brd"
+    }
+    
+    await broadcast({"type":"log", "level":"info", "msg":f"Starting Project-Wide AI Extraction for: {p.get('name')}"})
+    asyncio.create_task(process_email(master_query))
+    return {"status":"processing", "project_id": project_id}
 
 
 # ══════════════════════════════════════════════════════════════
@@ -467,29 +792,48 @@ async def cancel_event(event_id: str):
 # ══════════════════════════════════════════════════════════════
 @app.post("/api/brd/from-upload")
 async def brd_from_upload(file: UploadFile = File(...)):
-    """Directly upload a transcript/email file to generate BRD."""
-    content = (await file.read()).decode("utf-8", errors="ignore")
-    name    = (file.filename or "").lower()
-    stype   = ("transcript" if any(x in name for x in ["transcript","meeting","call"])
-                else "email" if "email" in name else "document")
-
+    """Upload a transcript, email, chat log, or PDF to generate a full BRD."""
+    raw_bytes = await file.read()
+    filename  = file.filename or "document.txt"
+    doc_id    = str(uuid.uuid4())[:8]
+    
+    # Use the MultiModal dispatcher to parse based on file type
+    parsed = MultiModalParsers.from_upload(raw_bytes, filename, doc_id)
+    
+    await broadcast({"type":"log", "level":"info", 
+        "msg":f"Parsing uploaded {parsed['source_type']}: {filename}"})
+    
     fake_email = {
-        "id":        str(uuid.uuid4())[:8],
-        "thread_id": str(uuid.uuid4())[:8],
-        "sender":    "upload@nexus.ai",
-        "subject":   f"BRD Request: {file.filename}",
-        "body":      f"Please generate a BRD from this {stype}:\n\n{content[:500]}",
-        "attachments": [{"name": file.filename, "content": content, "type": stype}],
+        "id":          doc_id,
+        "thread_id":   doc_id,
+        "sender":      "upload@nexus.ai",
+        "subject":     f"BRD Request: {filename}",
+        "body":        parsed["clean_text"][:3000],
+        "attachments": [{"name": filename, "content": parsed["clean_text"], "type": parsed["source_type"]}],
         "force_intent": "brd",
     }
     asyncio.create_task(process_email(fake_email))
-    return {"status":"processing","email_id":fake_email["id"]}
+    return {"status":"processing", "email_id": doc_id, "source_type": parsed["source_type"]}
 
 @app.get("/api/brd/{job_id}/result")
 async def get_brd(job_id: str):
     job = store["brd_jobs"].get(job_id)
     if not job: return {"error":"Not found"}
     return job["result"]
+
+@app.get("/api/brd/{job_id}/sections")
+async def get_brd_sections(job_id: str):
+    """Return BRD section text for in-page preview without downloading DOCX."""
+    job = store["brd_jobs"].get(job_id)
+    if not job: return {"error":"Not found"}
+    result = job["result"]
+    return {
+        "title":    result.get("title", "BRD"),
+        "version":  result.get("version", "1.0"),
+        "status":   result.get("status", "Draft"),
+        "sections": result.get("sections", {}),
+        "metadata": result.get("metadata", {}),
+    }
 
 @app.get("/api/brd/{job_id}/download")
 async def download_brd(job_id: str):
@@ -503,11 +847,13 @@ async def download_brd(job_id: str):
 
 @app.get("/api/brd/list")
 async def list_brds():
-    return {"brds":[
-        {"job_id":jid, "title":j["result"].get("title","BRD"),
-         "email_id":j.get("email_id")}
-        for jid,j in store["brd_jobs"].items()
-    ]}
+    return {"brds": list(reversed([
+        {"job_id": jid, "title": j["result"].get("title","BRD"),
+         "email_id": j.get("email_id"),
+         "sections_count": len(j["result"].get("sections",{})),
+         "metadata": j["result"].get("metadata",{})}
+        for jid, j in store["brd_jobs"].items()
+    ]))}
 
 
 # ══════════════════════════════════════════════════════════════
