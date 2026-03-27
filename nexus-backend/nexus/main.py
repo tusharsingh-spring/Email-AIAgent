@@ -496,6 +496,13 @@ async def list_emails(limit: int = MAX_EMAIL_FETCH):
         await broadcast({"type":"log","level":"error","msg":f"Inbox fetch failed: {e}"})
         return {"emails": [], "error": f"Inbox fetch failed: {e}"}
 
+@app.get("/api/emails/{email_id}")
+async def get_email(email_id: str):
+    for em in store.get("latest_emails", []):
+        if em.get("id") == email_id:
+            return {"email": em}
+    return {"error": "Email not found in cache. Fetch inbox first."}
+
 @app.post("/api/emails/process/{email_id}")
 async def manual_process(email_id: str):
     """Manually trigger agent on a specific email ID."""
@@ -566,6 +573,32 @@ async def list_actions_by_sections():
         "counts": {section: len(items) for section, items in grouped.items()},
         "total": len(store["actions"]),
     }
+
+
+@app.get("/api/clusters/pending")
+async def get_pending_clusters():
+    """Return AI clustering suggestions with email ids and suggested project names."""
+    clusters = [
+        {
+            "id": a.get("id"),
+            "project_name": a.get("project_name"),
+            "email_ids": a.get("email_ids", []),
+            "summary": a.get("summary"),
+            "created_at": a.get("created_at"),
+        }
+        for a in store["actions"] if a.get("status") == "pending_cluster"
+    ]
+    return {"clusters": clusters, "count": len(clusters)}
+
+
+@app.post("/api/clusters/recluster")
+async def force_recluster(limit: int = MAX_EMAIL_FETCH):
+    """Re-run clustering on the latest fetched inbox batch and emit pending clusters."""
+    emails = store.get("latest_emails", [])
+    if not emails:
+        return {"error": "No cached emails. Fetch inbox first via /api/emails."}
+    await process_cluster_batch(emails[:limit])
+    return {"status": "reclustered", "emails": min(len(emails), limit)}
 
 @app.post("/api/actions/{action_id}/approve")
 async def approve_action(action_id: str, body: dict = {}):
@@ -782,6 +815,18 @@ async def get_project_brd(project_id: str):
     brd = db_service.get_brd_for_project(project_id)
     return {"brd": brd} if brd else {"error": "Not found"}
 
+
+@app.get("/api/projects/{project_id}/brd/status")
+async def get_project_brd_status(project_id: str):
+    running = project_id in store.get("brd_running_projects", set())
+    brd = db_service.get_brd_for_project(project_id)
+    return {
+        "running": running,
+        "has_brd": bool(brd),
+        "docx_url": brd.get("docx_url") if brd else None,
+        "metadata": (brd.get("content", {}) or {}).get("metadata") if brd else None,
+    }
+
 @app.post("/api/projects/{project_id}/generate-brd")
 async def generate_project_brd(project_id: str):
     """Trigger the LangGraph agent on the FULL project context collected in the DB."""
@@ -810,6 +855,31 @@ async def generate_project_brd(project_id: str):
     await broadcast({"type":"brd_stage", "project_id": project_id, "stage": "ingestion"})
     asyncio.create_task(process_email(master_query))
     return {"status":"processing", "project_id": project_id}
+
+
+@app.post("/api/projects/{project_id}/agent")
+async def run_project_agent(project_id: str):
+    """Run the full LangGraph agent in BRD intent mode for this project (idempotent guard)."""
+    p = db_service.get_project_by_id(project_id)
+    if not p: return {"error":"Project not found"}
+    if project_id in store["brd_running_projects"]:
+        return {"status":"already_running","project_id": project_id}
+    context_str = db_service.get_project_context_string(project_id)
+    if not context_str:
+        return {"error": "Project context is empty. Link some emails or upload documents first."}
+    master_query = {
+        "id": f"proj_{project_id[:8]}",
+        "thread_id": f"proj_{project_id[:8]}",
+        "sender": "Project Context (DB)",
+        "subject": f"Project Agent Run: {p.get('name')}",
+        "body": context_str,
+        "project_id": project_id,
+        "force_intent": "brd"
+    }
+    store["brd_running_projects"].add(project_id)
+    await broadcast({"type":"log", "level":"info", "msg":f"LangGraph agent (BRD) triggered for project {p.get('name')}"})
+    asyncio.create_task(process_email(master_query))
+    return {"status":"processing","project_id": project_id}
 
 
 # ══════════════════════════════════════════════════════════════
