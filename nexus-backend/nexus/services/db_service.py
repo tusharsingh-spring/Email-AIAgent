@@ -7,6 +7,8 @@ load_dotenv()
 
 URL: str = os.getenv("SUPABASE_URL", "")
 KEY: str = os.getenv("SUPABASE_KEY", "")
+ALLOW_DEMO_CONTEXT = os.getenv("ALLOW_DEMO_CONTEXT", "false").lower() in ("1", "true", "yes")
+TRAINING_HINTS = ("enron", "ami", "sample", "dataset")
 
 _supabase: Optional[Client] = None
 
@@ -34,6 +36,11 @@ def get_project_by_id(project_id: str) -> Dict:
     db = get_db()
     res = db.table("projects").select("*").eq("id", project_id).single().execute()
     return res.data or {}
+
+def get_project_by_name(name: str) -> Optional[Dict]:
+    db = get_db()
+    res = db.table("projects").select("*").eq("name", name).limit(1).execute()
+    return (res.data or [None])[0]
 
 # --- Emails ---
 def upsert_emails(emails: List[Dict]):
@@ -105,15 +112,37 @@ def get_project_context_string(project_id: str) -> str:
     ctx = get_project_context_details(project_id)
     emails = ctx["emails"]
     docs = ctx["documents"]
-    
+
+    def _scrub_noise(text: str) -> str:
+        import re
+        text = re.sub(r"(?i)(Message-ID|Date|From|To|Subject|Mime-Version|Content-Type|X-[a-zA-Z-]+):.*?\n", "", text)
+        text = re.sub(r"\b(um|uh|like|you know|I mean|yeah|okay|right)\b", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    def _is_training_sample(filename: str) -> bool:
+        name = (filename or "").lower()
+        return any(hint in name for hint in TRAINING_HINTS)
+
     parts = []
     if emails:
         parts.append("--- PROJECT EMAILS ---")
         for em in emails:
-            parts.append(f"From: {em['sender']}\nSubject: {em['subject']}\nBody: {em['body'][:2000]}\n")
+            sender = em.get("sender", "")
+            subj = em.get("subject", "")
+            body = _scrub_noise(em.get("body", ""))[:2000]
+            parts.append(f"From: {sender}\nSubject: {subj}\nBody: {body}\n")
+
     if docs:
         parts.append("--- PROJECT DOCUMENTS ---")
         for d in docs:
-            parts.append(f"Source: {d['filename']}\nContent: {d['content'][:5000]}\n")
-            
-    return "\n".join(parts)
+            fname = d.get("filename", "document")
+            if not ALLOW_DEMO_CONTEXT and _is_training_sample(fname):
+                continue
+            dtype = (d.get("type") or "document").upper()
+            content = _scrub_noise(d.get("content", ""))[:5000]
+            parts.append(f"[{dtype}] {fname}\nContent: {content}\n")
+
+    combined = "\n".join(parts)
+    # Protect downstream LLMs from over-long contexts; ~8k tokens ≈ 32k chars
+    return combined[:32000]

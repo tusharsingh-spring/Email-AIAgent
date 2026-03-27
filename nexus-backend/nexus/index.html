@@ -456,15 +456,14 @@ code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-family:'DM Mon
             <div class="tab" onclick="setProjTab('brd', this)">Generated BRD</div>
          </div>
 <div id="pd-context" style="display:block">
-            <div class="g2">
-                <div>
-                    <div class="nav-grp" style="padding-left:0; color:var(--blu)">Linked Emails</div>
-                    <div id="pd-emails" class="empty" style="padding:10px 0">0 emails linked.</div>
-                </div>
-                <div>
-                    <div class="nav-grp" style="padding-left:0; color:var(--pur)">Meeting Transcripts & Docs</div>
-                    <div id="pd-docs" class="empty" style="padding:10px 0">0 documents uploaded.</div>
-                </div>
+            <div class="nav-grp" style="padding-left:0; color:var(--blu)">Linked Emails</div>
+            <div id="pd-emails" class="empty" style="padding:10px 0; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word;">
+                0 emails linked.
+            </div>
+
+            <div class="nav-grp" style="margin-top:20px; padding-left:0; color:var(--pur)">Meeting Transcripts & Docs</div>
+            <div id="pd-docs" class="empty" style="padding:10px 0; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word;">
+                0 documents uploaded.
             </div>
             
             <div class="card" style="margin-top:20px;border-style:dashed;background:transparent">
@@ -618,6 +617,7 @@ code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-family:'DM Mon
 <script>
 const API = 'http://localhost:8000';
 let ws = null, state = {actions:[], events:[], emails:[], brds:{}, authenticated:false, brdRunning:{}};
+let clusterHints = {};
 let actFilter = 'all';
 
 /* ── WebSocket ── */
@@ -711,25 +711,25 @@ function log(type, msg) {
                 document.getElementById('pd-name').textContent = p.name;
                 
                 // Load context
-                const res = await fetch(`${API}/api/projects/${p.id}/context`);
+                const res = await fetch(`/api/projects/${p.id}/context`);
                 const ctx = await res.json();
 
-                // Route Emails to the Left Column
+                // Inject Emails into Top Section
                 const emails = (ctx.emails||[]).map(e=>`
-                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:6px;margin-bottom:8px">
+                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:6px;margin-bottom:8px; word-wrap: break-word;">
                         <div style="font-size:10px;color:var(--tx3)">From: ${e.sender||''}</div>
                         <div style="font-size:11px;font-weight:600;margin:2px 0">${e.subject||'(no subject)'}</div>
-                        <div style="font-size:10px;color:var(--tx2);white-space:pre-wrap">${(e.body||'').slice(0,180)}...</div>
+                        <div style="font-size:10px;color:var(--tx2);white-space:pre-wrap">${(e.body||'').slice(0,200)}...</div>
                     </div>
                 `).join('') || '<div class="empty">No linked emails yet.</div>';
                 document.getElementById('pd-emails').innerHTML = emails;
                 
-                // Route Transcripts to the Right Column
+                // Inject Transcripts into Bottom Section
                 const docs = (ctx.documents||[]).map(d=>`
-                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:6px;margin-bottom:8px">
+                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:6px;margin-bottom:8px; word-wrap: break-word;">
                         <div style="font-size:11px;font-weight:600;color:var(--pur)">${d.filename}</div>
                         <div style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace">${d.type||'document'}</div>
-                        <div style="font-size:10px;color:var(--tx2);white-space:pre-wrap;margin-top:4px">${(d.content||'').slice(0,180)}...</div>
+                        <div style="font-size:10px;color:var(--tx2);white-space:pre-wrap;margin-top:4px">${(d.content||'').slice(0,200)}...</div>
                     </div>
                 `).join('') || '<div class="empty">No transcripts yet.</div>';
                 document.getElementById('pd-docs').innerHTML = docs;
@@ -740,33 +740,7 @@ function log(type, msg) {
                 <div style="font-size:10px;color:var(--tx3);margin-top:6px" id="brd-status-${p.id}"></div>
               `;
               renderProjectsRunning();
-
-                // Pull stored BRD for this project (Supabase-backed)
-                const brdTab = document.getElementById('pd-brd-content');
-                brdTab.innerHTML = '<div class="empty">Loading BRD...</div>';
-                try {
-                  const brdRes = await fetch(`${API}/api/projects/${p.id}/brd`);
-                  const brdData = await brdRes.json();
-                  const brd = brdData.brd;
-                  if (brd && brd.content && brd.content.sections) {
-                    const s = brd.content.sections;
-                    brdTab.innerHTML = `
-                      <h3 style="color:var(--tx);margin-bottom:12px">${brd.content.title || 'BRD'}</h3>
-                      <div style="margin-bottom:12px"><strong style="color:var(--a2)">1. Functional Requirements:</strong><br/>${s.functional_requirements || 'N/A'}</div>
-                      <div style="margin-bottom:12px"><strong style="color:var(--a2)">2. Non-Functional Requirements:</strong><br/>${s.non_functional_requirements || 'N/A'}</div>
-                      <div style="margin-bottom:12px"><strong style="color:var(--a2)">3. Stakeholders:</strong><br/>${s.stakeholders_decisions || 'N/A'}</div>
-                      <div style="margin-bottom:12px"><strong style="color:var(--a2)">4. Decisions & Approvals:</strong><br/>${(brd.content.decisions_made||s.decisions_made)|| 'N/A'}</div>
-                      <div style="margin-bottom:12px"><strong style="color:var(--a2)">5. Timelines & Milestones:</strong><br/>${s.timeline_milestones || 'N/A'}</div>
-                      <div style="margin-bottom:12px"><strong style="color:var(--a2)">6. Feature Prioritization:</strong><br/>${s.feature_prioritization || 'N/A'}</div>
-                    `;
-                  } else {
-                    brdTab.innerHTML = '<div class="empty">No BRD generated for this project yet.</div>';
-                  }
-                } catch(e) {
-                  brdTab.innerHTML = '<div class="empty">BRD unavailable (backend offline?)</div>';
-                }
             }
-
             async function generateProjectBRD(id) {
               try {
                 const btns = document.querySelectorAll(`[data-brd-btn="${id}"]`);
@@ -911,15 +885,15 @@ function handle(msg) {
         if (!state.authenticated) updateAuth(false);
       }
     }
-    if (msg.actions) state.actions = [...msg.actions];
+    if (msg.actions) { state.actions = [...msg.actions]; rebuildClusterHints(); }
     if (msg.meetings) state.events  = [...msg.meetings];
     if (msg.stats) updateStats(msg.stats);
     renderDash(); renderActions(); updateBadges();
   }
   if (msg.type === 'log')          log(msg.level, msg.msg);
-  if (msg.type === 'new_action')   { state.actions.unshift(msg.payload); renderDash(); renderActions(); updateBadges(); toast('AI Request: '+msg.payload.email?.subject,'ok'); }
-  if (msg.type === 'escalation')   { state.actions.unshift(msg.payload); renderDash(); renderActions(); renderEsc(); updateBadges(); toast('ESCALATED: '+msg.payload.email?.subject,'warn'); }
-  if (msg.type === 'action_update'){ const a=state.actions.find(x=>x.id===msg.id); if(a)a.status=msg.status; renderActions(); updateBadges(); }
+  if (msg.type === 'new_action')   { state.actions.unshift(msg.payload); rebuildClusterHints(); renderDash(); renderActions(); updateBadges(); toast('AI Request: '+msg.payload.email?.subject,'ok'); }
+  if (msg.type === 'escalation')   { state.actions.unshift(msg.payload); rebuildClusterHints(); renderDash(); renderActions(); renderEsc(); updateBadges(); toast('ESCALATED: '+msg.payload.email?.subject,'warn'); }
+  if (msg.type === 'action_update'){ const a=state.actions.find(x=>x.id===msg.id); if(a)a.status=msg.status; rebuildClusterHints(); renderActions(); updateBadges(); renderInbox(); }
   if (msg.type === 'meeting_created'){ state.events.unshift(msg.meeting); renderDash(); toast('Calendar event created: '+msg.meeting.title,'ok'); }
   if (msg.type === 'brd_stage')   { if(msg.stage) advanceBRDProgress(msg.stage); if(msg.project_id) state.brdRunning[msg.project_id]=true; }
   if (msg.type === 'brd_ready')   { state.brds[msg.job_id]={title:msg.title}; renderBRD(); updateBadges(); toast('BRD ready: '+msg.title,'ok'); advanceBRDProgress('docx'); if(msg.project_id) delete state.brdRunning[msg.project_id]; renderProjectsRunning(); }
@@ -1164,6 +1138,12 @@ function renderDash() {
 }
 
 let selectedInboxIds = new Set();
+function rebuildClusterHints() {
+  clusterHints = {};
+  (state.actions||[]).filter(a=>a.status==='pending_cluster').forEach(a=>{
+    (a.email_ids||[]).forEach(id=>{ clusterHints[id] = a; });
+  });
+}
 function toggleInboxSelect(id, e) {
   e.stopPropagation();
   if(selectedInboxIds.has(id)) selectedInboxIds.delete(id);
@@ -1204,7 +1184,12 @@ function renderInbox() {
     <div class="ei" style="align-items:center" onclick="showEmail('${e.id}')">
       <input type="checkbox" style="margin-right:8px; cursor:pointer" ${selectedInboxIds.has(e.id)?'checked':''} onclick="toggleInboxSelect('${e.id}', event)"/>
       <div class="ei-dot" style="background:var(--a)"></div>
-      <div style="flex:1;min-width:0"><div class="ei-sub">${e.subject}</div><div class="ei-from">${e.sender}</div><div class="ei-pre">${e.snippet||''}</div></div>
+      <div style="flex:1;min-width:0">
+        <div class="ei-sub">${e.subject}</div>
+        <div class="ei-from">${e.sender}</div>
+        <div class="ei-pre">${e.snippet||''}</div>
+        ${clusterHints[e.id] ? `<div style="margin-top:5px"><span class="badge b-pu">AI suggestion</span> <span style="font-size:10px;color:var(--tx2)">Cluster: ${clusterHints[e.id].project_name||'Suggested project'}</span> <button class="btn btn-sm btn-g" style="margin-left:6px" onclick="event.stopPropagation(); approve('${clusterHints[e.id].id}')">Apply</button></div>` : ''}
+      </div>
       <div class="ei-t">${FT(e.received_at||e.date)}</div>
     </div>`).join('');
 }
