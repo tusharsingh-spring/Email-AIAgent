@@ -1,42 +1,174 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getEmails, processEmail, clusterManual, getProjects, attachEmailToProject } from '../services/api'
+import { Inbox as InboxIcon, RefreshCw, Loader2, X, Link, Cpu, CheckSquare } from 'lucide-react'
 
-const FT = iso => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return iso || '' } }
+const FT = iso => {
+  try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+  catch { return iso || '' }
+}
+
+const initials = (sender = '') => {
+  const name = sender.split('@')[0]
+  return name.slice(0, 2).toUpperCase() || 'EX'
+}
+
+const avatarColor = (sender = '') => {
+  let h = 0
+  for (let i = 0; i < sender.length; i++) h = (h * 31 + sender.charCodeAt(i)) % 360
+  return `hsl(${h},55%,45%)`
+}
+
+function EmailRow({ email, isSelected, onSelect, onClick, isOpen, projects, onAssign, onProcess }) {
+  const [selProject, setSelProject] = useState(email.project_suggestion?.project_id || '')
+  const [assigning, setAssigning] = useState(false)
+
+  const bg = avatarColor(email.sender || '')
+  const ini = initials(email.sender)
+
+  const handleAssign = async (e) => {
+    e.stopPropagation()
+    if (!selProject) return
+    setAssigning(true)
+    await onAssign(email.id, selProject)
+    setAssigning(false)
+  }
+
+  return (
+    <div
+      className="border-b border-brand-border last:border-0 cursor-pointer group transition-colors hover:bg-brand-hover"
+      style={{ background: isOpen ? 'rgba(255,255,255,0.03)' : undefined }}
+      onClick={onClick}
+    >
+      <div className="flex items-start gap-3 p-4">
+        {/* Checkbox */}
+        <div className="pt-0.5 shrink-0" onClick={e => { e.stopPropagation(); onSelect(email.id) }}>
+          <div className={`w-4 h-4 rounded-sm border transition-colors ${isSelected ? 'bg-brand-blue border-brand-blue' : 'border-brand-border hover:border-white/30'}`} />
+        </div>
+
+        {/* Avatar */}
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center font-space text-[10px] font-bold shrink-0"
+          style={{ background: bg, color: 'rgba(0,0,0,0.8)' }}
+        >
+          {ini}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <span className="font-bebas text-[18px] text-brand-text leading-none truncate">
+              {(email.sender || '').split('@')[0] || 'Unknown'}
+            </span>
+            <span className="font-space text-[9px] text-brand-muted/40 shrink-0">{FT(email.received_at || email.date)}</span>
+          </div>
+          <div className="font-dm text-[12px] opacity-60 truncate mb-1">{email.subject || '—'}</div>
+          <div className="font-dm text-[11px] opacity-30 line-clamp-1">{email.snippet || ''}</div>
+
+          {email.project_id && (
+            <div className="mt-1 font-space text-[9px] text-[#00ff9d]">✓ Linked to project</div>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: isOpen ? '1fr' : '0fr',
+          transition: 'grid-template-rows 0.35s cubic-bezier(0.16,1,0.3,1)',
+        }}
+      >
+        <div style={{ overflow: 'hidden' }}>
+          {isOpen && (
+            <div className="px-4 pb-5 pt-0" onClick={e => e.stopPropagation()}>
+              {/* Sender + date */}
+              <div className="font-space text-[9px] text-brand-muted/30 mb-3">
+                From: {email.sender} &nbsp;·&nbsp; {email.date || ''}
+              </div>
+
+              {/* Body */}
+              <div className="font-dm text-[13px] leading-[1.65] opacity-60 bg-brand-input p-4 rounded-sm mb-4 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+                {email.body || email.snippet || '(empty)'}
+              </div>
+
+              {/* Project assignment */}
+              {!email.project_id && (
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  <select
+                    value={selProject}
+                    onChange={e => setSelProject(e.target.value)}
+                    className="bg-brand-input border border-brand-border text-brand-text font-space text-[10px] px-3 py-2 rounded-sm outline-none focus:border-brand-blue transition-colors"
+                    disabled={assigning}
+                  >
+                    <option value="">— Assign to project —</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  {email.project_suggestion && (
+                    <span className="font-space text-[9px] text-brand-blue/60">
+                      AI suggests: {email.project_suggestion.project_name}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleAssign}
+                    disabled={!selProject || assigning}
+                    className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-4 py-2 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-40"
+                  >
+                    {assigning ? <Loader2 size={10} className="animate-spin" /> : <Link size={10} />}
+                    Assign
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onProcess(email.id)}
+                  className="flex items-center gap-1.5 border border-brand-blue/40 text-brand-blue px-4 py-2 rounded-sm font-space text-[9px] uppercase tracking-widest hover:bg-brand-blue/10 transition-colors"
+                >
+                  <Cpu size={11} /> Process with LangGraph
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Inbox() {
-  const { state, dispatch, toast, addLog } = useApp()
+  const { state, dispatch, toast, addLog } = useApp() || {}
   const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState(null)
+  const [openId, setOpenId] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [projects, setProjects] = useState([])
-  const [selections, setSelections] = useState({})
-  const [assigning, setAssigning] = useState({})
+  const [clusterModal, setClusterModal] = useState(false)
+  const [clusterName, setClusterName] = useState('')
+  const clusterRef = useRef(null)
 
   useEffect(() => {
-    load()
+    loadEmails()
     loadProjects()
   }, [])
 
-  const load = async () => {
+  useEffect(() => {
+    if (clusterModal) setTimeout(() => clusterRef.current?.focus(), 50)
+  }, [clusterModal])
+
+  const loadEmails = async () => {
     setLoading(true)
-    addLog('info', 'Fetching real Gmail inbox...')
+    addLog?.('info', 'Fetching real Gmail inbox...')
     try {
       const d = await getEmails(10)
-      if (d.error) { toast(d.error, 'warn'); addLog('error', d.error); return }
-      dispatch({ type: 'SET_EMAILS', emails: d.emails || [] })
-      addLog('ok', `${(d.emails || []).length} emails fetched`)
-    } catch { toast('Backend not running', 'warn') }
+      if (d.error) { toast?.(d.error, 'warn'); addLog?.('error', d.error); setLoading(false); return }
+      dispatch?.({ type: 'SET_EMAILS', emails: d.emails || [] })
+      addLog?.('ok', `${(d.emails || []).length} emails fetched`)
+    } catch { toast?.('Backend not running', 'warn') }
     setLoading(false)
   }
 
   const loadProjects = async () => {
-    try {
-      const d = await getProjects()
-      setProjects(d.projects || [])
-    } catch {
-      /* ignore */
-    }
+    try { const d = await getProjects(); setProjects(d.projects || []) } catch {}
   }
 
   const toggleSelect = (id) => {
@@ -47,135 +179,175 @@ export default function Inbox() {
     })
   }
 
-  const clusterSelected = async () => {
-    if (!selectedIds.size) return
-    const title = window.prompt("Enter a theme for this cluster (e.g. 'Website Rewrite'):", 'User Identified Project')
-    if (title === null) return
+  const handleCluster = async () => {
+    if (!clusterName.trim() || !selectedIds.size) return
     try {
-      const r = await clusterManual(Array.from(selectedIds), title)
-      if (r.error) { toast(r.error, 'warn'); return }
-      toast(`Clustered ${selectedIds.size} emails`, 'ok')
+      const r = await clusterManual(Array.from(selectedIds), clusterName.trim())
+      if (r.error) { toast?.(r.error, 'warn'); return }
+      toast?.(`Clustered ${selectedIds.size} emails into "${clusterName.trim()}"`, 'ok')
       setSelectedIds(new Set())
-    } catch { toast('Cluster failed', 'warn') }
-  }
-
-  const handleProcess = async (id) => {
-    try { await processEmail(id); toast('Processing...', 'ok'); addLog('info', `Manual trigger: ${id}`) }
-    catch { toast('Failed', 'warn') }
+      setClusterModal(false)
+      setClusterName('')
+    } catch { toast?.('Cluster failed', 'warn') }
   }
 
   const handleAssign = async (emailId, projectId) => {
-    if (!projectId) { toast('Select a project first', 'warn'); return }
-    setAssigning(prev => ({ ...prev, [emailId]: true }))
+    if (!projectId) { toast?.('Select a project first', 'warn'); return }
     try {
       const res = await attachEmailToProject(projectId, emailId)
       if (res.error) throw new Error(res.error)
-      toast('Email linked to project', 'ok')
-      addLog('ok', `Email ${emailId} → project ${projectId}`)
-      dispatch({
-        type: 'SET_EMAILS',
-        emails: state.emails.map(e => e.id === emailId ? { ...e, project_id: projectId } : e)
-      })
-    } catch (e) {
-      toast(e.message || 'Attach failed', 'warn')
-    } finally {
-      setAssigning(prev => {
-        const next = { ...prev }
-        delete next[emailId]
-        return next
-      })
-    }
+      toast?.('Email linked to project', 'ok')
+      addLog?.('ok', `Email ${emailId} → project ${projectId}`)
+      dispatch?.({ type: 'SET_EMAILS', emails: (state?.emails || []).map(e => e.id === emailId ? { ...e, project_id: projectId } : e) })
+    } catch (e) { toast?.(e.message || 'Attach failed', 'warn') }
   }
 
-  const emails = state.emails
+  const handleProcess = async (id) => {
+    try { await processEmail(id); toast?.('Processing triggered', 'ok'); addLog?.('info', `Manual trigger: ${id}`) }
+    catch { toast?.('Failed', 'warn') }
+  }
+
+  const emails = state?.emails || []
+  const hasSelected = selectedIds.size > 0
 
   return (
-    <div>
-      <div className="ph">
-        <div className="pt">Real Inbox</div>
-        <div className="ps-h">Unread Gmail emails — NEXUS monitors these automatically</div>
-      </div>
-      <div className="g2">
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdr)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div className="card-t" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              Unread emails
-              {selectedIds.size > 0 && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button className="btn btn-a btn-sm" onClick={clusterSelected}>⬡ Manual Cluster & BRD</button>
-                  <button className="btn btn-g btn-sm" onClick={() => setSelectedIds(new Set())}>Clear</button>
-                </span>
-              )}
-            </div>
-            <button className="btn btn-g btn-sm" onClick={load} disabled={loading}>{loading ? <span className="spin" /> : '↻ Fetch'}</button>
-          </div>
-          <div>
-            {emails.length ? emails.map(e => (
-              <div key={e.id} className="ei" style={{ alignItems: 'center' }} onClick={() => setSelected(e)}>
-                <input type="checkbox" style={{ marginRight: '8px', cursor: 'pointer' }} checked={selectedIds.has(e.id)} onChange={() => toggleSelect(e.id)} onClick={ev => ev.stopPropagation()} />
-                <div className="ei-dot" style={{ background: 'var(--a)' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="ei-sub">{e.subject}</div>
-                  <div className="ei-from">{e.sender}</div>
-                  <div className="ei-pre">{e.snippet || ''}</div>
-                  {e.project_id ? (
-                    <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--grn)' }}>✓ Linked to project</span>
-                      {e.project_suggestion && (
-                        <span style={{ fontSize: '10px', color: 'var(--tx3)' }}>
-                          🤖 Suggested: <strong style={{ color: 'var(--a2)' }}>{e.project_suggestion.project_name}</strong>
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }} onClick={ev => ev.stopPropagation()}>
-                      <select
-                        value={selections[e.id] ?? e.project_suggestion?.project_id ?? ''}
-                        onChange={(ev) => setSelections(prev => ({ ...prev, [e.id]: ev.target.value }))}
-                        disabled={assigning[e.id]}
-                        style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 'var(--rs)', padding: '6px 8px', color: 'var(--tx)', fontSize: '11px', minWidth: '180px' }}
-                      >
-                        <option value="">— Select project —</option>
-                        {projects.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                      {e.project_suggestion && (
-                        <span style={{ fontSize: '10px', color: 'var(--tx3)' }}>
-                          🤖 Suggests: <strong style={{ color: 'var(--a2)' }}>{e.project_suggestion.project_name}</strong>
-                        </span>
-                      )}
-                      <button
-                        className="btn btn-a btn-sm"
-                        onClick={() => handleAssign(e.id, selections[e.id] ?? e.project_suggestion?.project_id ?? '')}
-                        disabled={assigning[e.id]}
-                      >
-                        {assigning[e.id] ? 'Linking…' : 'Assign →'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="ei-t">{FT(e.received_at || e.date)}</div>
-              </div>
-            )) : <div className="empty"><div className="ei">✉</div>Click Fetch to load real emails</div>}
-          </div>
-        </div>
-        <div className="card" id="email-detail">
-          {selected ? (
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '500', marginBottom: '3px' }}>{selected.subject}</div>
-              <div style={{ fontSize: '10px', color: 'var(--tx2)', marginBottom: '2px' }}>From: {selected.sender}</div>
-              <div style={{ fontSize: '10px', color: 'var(--tx3)', marginBottom: '12px', fontFamily: "'DM Mono',monospace" }}>{selected.date || ''}</div>
-              <div style={{ background: 'var(--bg3)', borderRadius: 'var(--rs)', padding: '10px', fontSize: '11px', color: 'var(--tx2)', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '240px', overflowY: 'auto' }}>
-                {selected.body || selected.snippet || '(empty)'}
-              </div>
-              <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
-                <button className="btn btn-a btn-sm" onClick={() => handleProcess(selected.id)}>⚡ Process with LangGraph</button>
-              </div>
-            </div>
-          ) : <div className="empty"><div className="ei">✉</div>Select an email</div>}
+    <div className="pb-20">
+
+      {/* HEADER */}
+      <div className="mb-10">
+        <div className="htag mb-4">Communication / Gmail</div>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+          <h1 className="font-bebas text-[clamp(38px,6.5vw,80px)] leading-[0.9] tracking-[0.01em] uppercase text-brand-text">
+            Real Inbox
+          </h1>
+          <button
+            onClick={loadEmails}
+            disabled={loading}
+            className="flex items-center gap-2 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 px-5 py-2.5 rounded-sm font-space text-[10px] uppercase tracking-widest transition-colors hover:scale-[1.02] active:scale-[0.98]"
+          >
+            {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {loading ? 'Fetching...' : 'Fetch Emails'}
+          </button>
         </div>
       </div>
+
+      {/* EMAIL LIST */}
+      {emails.length > 0 ? (
+        <div className="bg-brand-panel border border-brand-border rounded-sm overflow-hidden">
+          {/* List header */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border">
+            <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted/40">
+              {emails.length} messages
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="font-space text-[9px] text-brand-blue">{selectedIds.size} selected</span>
+                <button
+                  onClick={() => setClusterModal(true)}
+                  className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-3 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+                >
+                  <CheckSquare size={10} /> Cluster & BRD
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-brand-muted/40 hover:text-white transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {emails.map(e => (
+            <EmailRow
+              key={e.id}
+              email={e}
+              isSelected={selectedIds.has(e.id)}
+              onSelect={toggleSelect}
+              onClick={() => setOpenId(openId === e.id ? null : e.id)}
+              isOpen={openId === e.id}
+              projects={projects}
+              onAssign={handleAssign}
+              onProcess={handleProcess}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <InboxIcon size={48} style={{ color: 'rgba(255,255,255,0.08)' }} />
+          <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted/40">
+            {loading ? 'Fetching emails from Gmail...' : 'Click "Fetch Emails" to load your real Gmail inbox'}
+          </div>
+        </div>
+      )}
+
+      {/* Floating selection bar */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: hasSelected ? '24px' : '-80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          transition: 'bottom 0.35s cubic-bezier(0.16,1,0.3,1)',
+          zIndex: 8000,
+        }}
+        className="flex items-center gap-3 bg-[#111] border border-brand-border rounded-full px-5 py-3 shadow-2xl"
+      >
+        <span className="font-space text-[10px] text-brand-muted">{selectedIds.size} selected</span>
+        <button
+          onClick={() => setClusterModal(true)}
+          className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-4 py-1.5 rounded-full font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+        >
+          <CheckSquare size={10} /> Cluster & BRD
+        </button>
+        <button
+          onClick={() => setSelectedIds(new Set())}
+          className="text-brand-muted/40 hover:text-white transition-colors"
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      {/* Cluster Modal */}
+      {clusterModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}
+          onClick={() => setClusterModal(false)}
+        >
+          <div
+            className="bg-[#080808] border border-brand-border rounded-sm p-6 w-full max-w-[420px] mx-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-blue mb-1">Manual Cluster</div>
+            <div className="font-bebas text-3xl text-brand-text mb-4">Name this Cluster</div>
+            <input
+              ref={clusterRef}
+              type="text"
+              placeholder="e.g. Website Rewrite Sprint"
+              value={clusterName}
+              onChange={e => setClusterName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCluster(); if (e.key === 'Escape') setClusterModal(false) }}
+              className="w-full bg-brand-input border border-brand-border text-brand-text px-4 py-3 rounded-sm font-dm text-[14px] outline-none focus:border-brand-blue transition-colors mb-4"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCluster}
+                disabled={!clusterName.trim()}
+                className="flex-1 bg-brand-blue text-brand-black py-2.5 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-40"
+              >
+                Cluster {selectedIds.size} Emails
+              </button>
+              <button
+                onClick={() => setClusterModal(false)}
+                className="px-4 py-2.5 border border-brand-border text-brand-muted hover:text-white rounded-sm font-space text-[10px] uppercase tracking-widest transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

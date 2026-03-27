@@ -28,7 +28,7 @@ const PipelineNode = ({ icon: Icon, label, status, subtext }) => {
   )
 }
 
-export default function PipelineGraph({ contextCount, isRunning, brdIsReady, activeBrdId, onDownload, onRun }) {
+export default function PipelineGraph({ contextCount, isRunning, brdIsReady, activeBrdId, brdDocx, onDownload, onRun }) {
   // Determine Node States
   const hasContext = contextCount > 0
   const n1 = hasContext ? 'complete' : 'pending' // Ingress
@@ -44,10 +44,19 @@ export default function PipelineGraph({ contextCount, isRunning, brdIsReady, act
           <h2 className="font-space text-[12px] tracking-[0.2em] text-brand-muted uppercase mb-1">Intelligence Pipeline</h2>
           <div className="font-bebas text-3xl tracking-[0.02em] text-brand-text">Data Synthesis Graph</div>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          {brdDocx && (
+             <a 
+               href={brdDocx.startsWith('http') ? brdDocx : `/api/brd/${brdDocx}`} 
+               target="_blank" rel="noreferrer"
+               className="bg-brand-blue/10 hover:bg-brand-blue/30 text-brand-blue border border-brand-blue px-6 py-3 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2"
+             >
+               <Download size={14} /> Download DOCX
+             </a>
+          )}
           {brdIsReady ? (
-             <button onClick={() => onDownload(activeBrdId)} className="bg-brand-blue hover:bg-white text-brand-black px-6 py-3 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2">
-               <Download size={14} /> Fetch BRD Document
+             <button onClick={() => onDownload(activeBrdId)} className="bg-brand-yellow hover:bg-white text-brand-black px-6 py-3 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2">
+               <Download size={14} /> Download PDF
              </button>
           ) : (
              <button onClick={onRun} disabled={!hasContext || isRunning} className="bg-brand-text hover:bg-brand-yellow text-brand-black disabled:opacity-30 disabled:hover:bg-brand-text px-6 py-3 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-2">

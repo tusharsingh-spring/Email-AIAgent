@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../context/AppContext'
 
-const WS_URL = 'ws://localhost:8000/ws/live'
+const WS_URL = `ws://${window.location.hostname}:8000/ws/live`
 
 export default function WebSocketProvider({ children }) {
   const { dispatch, toast, addLog } = useApp()

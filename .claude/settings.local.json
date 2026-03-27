@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(dir /s /b D:Email-AIAgent)",
+      "Bash(findstr /i \"inspo\\\\|design.*html\\\\|ref.*html\\\\|html.*design\")",
+      "Bash(dir /s /b D:Email-AIAgentfrontend)",
+      "Bash(dir /s /b D:Email-AIAgent /A)",
+      "Bash(findstr /i inspo)",
+      "Bash(dir /s /b \"D:\\\\Email-AIAgent\\\\frontend\\\\src\")",
+      "Bash(dir /s /b D:Email-AIAgentfrontendsrc)",
+      "Bash(taskkill /F /IM node.exe)"
+    ]
+  }
+}

@@ -78,6 +78,7 @@ export const attachEmail = (id, email_id) =>
     headers: {'Content-Type': 'application/json'}, 
     body: JSON.stringify({email_id}) 
   })
+export const attachEmailToProject = attachEmail
 export const uploadProjectDoc = (projectId, file) => {
   const fd = new FormData()
   fd.append('file', file)
