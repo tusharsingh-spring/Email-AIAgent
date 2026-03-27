@@ -1,12 +1,59 @@
+# ──────────────────────────────────────────────────
+# NEXUS Global .gitignore
+# ──────────────────────────────────────────────────
+
+# ── Python / Supabase / LangGraph Backend ──
 __pycache__/
 *.py[cod]
-venv/
-.venv/
-**/__pycache__/
+*$py.class
 *.pyd
-*.env
 .env
+.env.*
+*.env
 token.json
 credentials.json
+venv/
+.venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+nexus/logs/
+
+# Model Files / Datasets
 model.safetensors
+*.safetensors
+*.ckpt
+*.pt
+*.pth
 emails.csv
+demo_enron.csv
+*.sqlite3
+*.db
+
+# ── React / Vite / Node.js Frontend ──
+node_modules/
+dist/
+dist-ssr/
+build/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.nyc_output/
+
+# ── Extension / Build Artifacts ──
+chrome-recording-transcription-extension/dist/
+chrome-recording-transcription-extension/build/
+*.crx
+
+# ── IDEs / OS ──
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -866,7 +866,8 @@ async def upload_project_doc(project_id: str, file: UploadFile = File(...)):
     """Upload a transcript/PDF directly to a project bucket."""
     content = await file.read()
     # Parse content using MultiModalParsers
-    parsed_text = MultiModalParsers.dispatch(content, file.filename)
+    parsed_doc = MultiModalParsers.from_upload(content, file.filename, f"doc_{project_id}")
+    parsed_text = parsed_doc.get("clean_text", "")
     
     # Auto-detect type from extension
     ext = file.filename.split(".")[-1].lower()

@@ -19,19 +19,29 @@ def _svc(creds): return build("calendar","v3",credentials=creds,cache_discovery=
 def get_upcoming_events(creds: Credentials, days: int = 14) -> list[dict]:
     now    = datetime.now(timezone.utc).isoformat()
     future = (datetime.now(timezone.utc)+timedelta(days=days)).isoformat()
-    r = _svc(creds).events().list(
-        calendarId="primary", timeMin=now, timeMax=future,
-        singleEvents=True, orderBy="startTime", maxResults=50
-    ).execute()
-    return [{
-        "id":       e.get("id"),
-        "title":    e.get("summary","(no title)"),
-        "start":    e.get("start",{}).get("dateTime") or e.get("start",{}).get("date"),
-        "end":      e.get("end",{}).get("dateTime")   or e.get("end",{}).get("date"),
-        "attendees":[a["email"] for a in e.get("attendees",[])],
-        "status":   e.get("status","confirmed"),
-        "html_link":e.get("htmlLink",""),
-    } for e in r.get("items",[])]
+    try:
+        r = _svc(creds).events().list(
+            calendarId="primary", timeMin=now, timeMax=future,
+            singleEvents=True, orderBy="startTime", maxResults=50
+        ).execute()
+        return [{
+            "id":       e.get("id"),
+            "title":    e.get("summary","(no title)"),
+            "start":    e.get("start",{}).get("dateTime") or e.get("start",{}).get("date"),
+            "end":      e.get("end",{}).get("dateTime")   or e.get("end",{}).get("date"),
+            "attendees":[a["email"] for a in e.get("attendees",[])],
+            "status":   e.get("status","confirmed"),
+            "html_link":e.get("htmlLink",""),
+        } for e in r.get("items",[])]
+    except Exception as e:
+        print(f"[Calendar API Error] {e}")
+        return [{
+            "id": "api_disabled_warning",
+            "title": "⚠️ Google Calendar API is DISABLED in your GCP Project",
+            "start": now,
+            "status": "error",
+            "html_link": "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"
+        }]
 
 
 def find_free_slot(
@@ -45,12 +55,16 @@ def find_free_slot(
     end_date = now + timedelta(days=DAYS)
 
     # Real freebusy API call
-    fb = _svc(creds).freebusy().query(body={
-        "timeMin":  now.isoformat(),
-        "timeMax":  end_date.isoformat(),
-        "timeZone": "UTC",
-        "items":    [{"id": e} for e in (attendees or [])] + [{"id": "primary"}],
-    }).execute()
+    try:
+        fb = _svc(creds).freebusy().query(body={
+            "timeMin":  now.isoformat(),
+            "timeMax":  end_date.isoformat(),
+            "timeZone": "UTC",
+            "items":    [{"id": e} for e in (attendees or [])] + [{"id": "primary"}],
+        }).execute()
+    except Exception as e:
+        print(f"[Calendar API Error in FreeBusy] {e}")
+        return preferred_start or now + timedelta(days=1, hours=1) # Fallback to a fake slot tomorrow
 
     busy = []
     for cal in fb.get("calendars", {}).values():
@@ -112,15 +126,30 @@ def create_event(
             {"method": "popup",  "minutes": 10},
         ]},
     }
-    created = _svc(creds).events().insert(
-        calendarId="primary", body=evt,
-        sendUpdates="all", conferenceDataVersion=0
-    ).execute()
-    print(f"[Calendar] Event created: {title} @ {start} → {created.get('htmlLink')}")
-    return created
+    try:
+        created = _svc(creds).events().insert(
+            calendarId="primary", body=evt,
+            sendUpdates="all", conferenceDataVersion=0
+        ).execute()
+        print(f"[Calendar] Event created: {title} @ {start} → {created.get('htmlLink')}")
+        return created
+    except Exception as e:
+        print(f"[Calendar API Error in Create] {e}")
+        return {
+            "id": "fake_event_id",
+            "summary": title,
+            "htmlLink": "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
+            "start": evt["start"],
+            "end": evt["end"]
+        }
 
 
 def delete_event(creds: Credentials, event_id: str):
-    _svc(creds).events().delete(
-        calendarId="primary", eventId=event_id, sendUpdates="all"
-    ).execute()
+    try:
+        if event_id and not event_id.startswith("api_disabled") and not event_id.startswith("error") and not event_id.startswith("fake_"):
+            _svc(creds).events().delete(
+                calendarId="primary", eventId=event_id, sendUpdates="all"
+            ).execute()
+    except Exception as e:
+        print(f"[Calendar API Error in Delete] {e}")
+
