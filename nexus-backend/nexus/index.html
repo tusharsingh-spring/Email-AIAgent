@@ -539,7 +539,7 @@ function updateStats(d) {
 }
 
 async function loadInbox() {
-  try { log('info','Fetching real Gmail inbox...'); const d=await(await fetch(`${API}/api/emails`)).json(); state.emails=d.emails||[]; renderInbox(); updateBadges(); log('ok',`${state.emails.length} unread emails fetched`); }
+  try { log('info','Fetching real Gmail inbox...'); const d=await(await fetch(`${API}/api/emails?limit=30`)).json(); if(d.error){ toast(d.error,'warn'); log('error',d.error); } state.emails=d.emails||[]; renderInbox(); updateBadges(); log('ok',`${state.emails.length} unread emails fetched`); }
   catch(e){ toast('Backend not running','warn'); }
 }
 async function loadCalendar() {
@@ -547,9 +547,18 @@ async function loadCalendar() {
   catch(e){ toast('Calendar sync failed','warn'); }
 }
 async function loadActions() {
-  try { const d=await(await fetch(`${API}/api/actions`)).json(); state.actions=d.actions||[]; renderActions(); renderEsc(); updateBadges(); } catch(e){}
+  try { const d=await(await fetch(`${API}/api/actions`)).json(); if(d.error){ toast(d.error,'warn'); } state.actions=d.actions||[]; renderActions(); renderEsc(); updateBadges(); } catch(e){}
 }
-async function refreshAll() { loadStats(); loadActions(); }
+async function loadBRDs() {
+  try {
+    const d = await (await fetch(`${API}/api/brd/list`)).json();
+    state.brds = {};
+    (d.brds || []).forEach(b => { state.brds[b.job_id] = { title: b.title, email_id: b.email_id }; });
+    renderBRD();
+    updateBadges();
+  } catch(e){}
+}
+async function refreshAll() { loadStats(); loadActions(); loadInbox(); loadBRDs(); }
 
 /* ── Approve / reject ── */
 async function approve(id) {
@@ -564,11 +573,12 @@ async function approve(id) {
       body: JSON.stringify({body, subject: a.draft_subject})
     });
     const d = await r.json();
+    if(d.error){ toast(d.error,'warn'); log('error', d.error); return; }
     if(d.status==='sent') { a.status='sent'; renderActions(); updateBadges(); toast('Real email sent!','ok'); }
   } catch(e){ toast('Send failed','warn'); }
 }
 async function reject(id) {
-  try { await fetch(`${API}/api/actions/${id}/reject`,{method:'POST'}); const a=state.actions.find(x=>x.id===id); if(a)a.status='rejected'; renderActions(); updateBadges(); toast('Rejected','warn'); }
+  try { const d=await (await fetch(`${API}/api/actions/${id}/reject`,{method:'POST'})).json(); if(d.error){ toast(d.error,'warn'); return; } const a=state.actions.find(x=>x.id===id); if(a)a.status='rejected'; renderActions(); updateBadges(); toast('Rejected','warn'); }
   catch(e){}
 }
 async function resolveEsc(id) { const a=state.actions.find(x=>x.id===id); if(a)a.status='resolved'; renderEsc(); updateBadges(); toast('Escalation resolved','ok'); }
@@ -694,7 +704,7 @@ function showEmail(id) {
 }
 
 async function manualProcess(id) {
-  try { await fetch(`${API}/api/emails/process/${id}`,{method:'POST'}); toast('Processing...','ok'); log('info',`Manual trigger: ${id}`); }
+  try { const d=await (await fetch(`${API}/api/emails/process/${id}`,{method:'POST'})).json(); if(d.error){ toast(d.error,'warn'); log('error',d.error); return; } toast('Processing...','ok'); log('info',`Manual trigger: ${id}`); }
   catch(e){ toast('Failed','warn'); }
 }
 
@@ -873,6 +883,7 @@ const DEMO_BRD_PREVIEW = {title:'BRD: AI Customer Support Chatbot', fr:12, nfr:7
 /* ── Init ── */
 document.addEventListener('DOMContentLoaded', ()=>{
   connectWS(); checkAuth(); loadStats();
+  loadInbox(); loadActions(); loadBRDs();
   log('info','NEXUS initialized — LangGraph + Gmail API + Calendar API');
   log('info','Connecting to backend at localhost:8000...');
   setInterval(()=>{ loadStats(); updateBadges(); }, 30000);

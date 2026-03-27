@@ -4,13 +4,16 @@ Sends REAL emails via Gmail API. No SMTP password.
 Handles threading, de-duplication, attachment extraction.
 """
 import base64, email as email_lib
-from datetime import datetime
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import parseaddr
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from google.oauth2.credentials import Credentials
+import re
 
 DISCLAIMER = (
     "\n\n─────────────────────────────────────────\n"
@@ -20,6 +23,27 @@ DISCLAIMER = (
 )
 
 _processed = set()   # de-duplication cache
+
+
+class GmailRateLimitError(Exception):
+    def __init__(self, message: str, retry_after_seconds: int = 60):
+        super().__init__(message)
+        self.retry_after_seconds = max(1, int(retry_after_seconds))
+
+
+def _retry_after_seconds_from_error(err: HttpError) -> int:
+    # Gmail often returns "Retry after 2026-...Z" in the error payload.
+    text = str(err)
+    m = re.search(r"Retry after ([0-9T:\.\-]+Z)", text)
+    if not m:
+        return 60
+    ts = m.group(1).replace("Z", "+00:00")
+    try:
+        retry_at = datetime.fromisoformat(ts)
+        now = datetime.now(timezone.utc)
+        return max(1, int((retry_at - now).total_seconds()))
+    except Exception:
+        return 60
 
 
 def _svc(creds: Credentials):
@@ -34,9 +58,15 @@ def get_owner_email(creds: Credentials) -> str:
 def fetch_unread_emails(creds: Credentials, limit: int = 25) -> list[dict]:
     """Fetch real unread emails from Gmail inbox. Skip already-processed IDs."""
     svc     = _svc(creds)
-    result  = svc.users().messages().list(
-        userId="me", q="is:unread -from:me", maxResults=limit
-    ).execute()
+    try:
+        result  = svc.users().messages().list(
+            userId="me", q="is:unread -from:me", maxResults=limit
+        ).execute()
+    except HttpError as e:
+        if e.resp is not None and e.resp.status == 429:
+            wait_s = _retry_after_seconds_from_error(e)
+            raise GmailRateLimitError(f"Gmail API rate-limited. Retry in {wait_s}s", wait_s) from e
+        raise
 
     emails = []
     for ref in result.get("messages", []):
@@ -56,6 +86,7 @@ def fetch_unread_emails(creds: Credentials, limit: int = 25) -> list[dict]:
                 "thread_id":   msg.get("threadId", msg_id),
                 "message_id":  headers.get("Message-ID", ""),
                 "sender":      headers.get("From", ""),
+                "sender_email":parseaddr(headers.get("From", ""))[1],
                 "subject":     headers.get("Subject", "(no subject)"),
                 "date":        headers.get("Date", ""),
                 "body":        body,
@@ -81,6 +112,16 @@ def _extract_body_and_attachments(svc, msg: dict) -> tuple[str, list[dict]]:
 
         if mime == "text/plain" and data:
             body += base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
+        elif mime == "text/html" and data and not body.strip():
+            html = base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="ignore")
+            # Lightweight HTML-to-text fallback so classifier gets usable content.
+            body += (
+                html.replace("<br>", "\n")
+                .replace("<br/>", "\n")
+                .replace("<br />", "\n")
+                .replace("</p>", "\n")
+                .replace("</div>", "\n")
+            )
         elif mime.startswith("multipart/"):
             for part in payload.get("parts", []):
                 walk(part)
@@ -147,6 +188,13 @@ def send_email(
     owner  = svc.users().getProfile(userId="me").execute()["emailAddress"]
 
     full_body = body + DISCLAIMER
+    cleaned_to = []
+    for recipient in to:
+        addr = parseaddr(recipient)[1] if recipient else ""
+        if addr:
+            cleaned_to.append(addr)
+    if not cleaned_to:
+        raise ValueError("No valid recipient email addresses provided")
 
     if attachment_path:
         mime_msg = MIMEMultipart()
@@ -164,7 +212,7 @@ def send_email(
         mime_msg.attach(MIMEText(full_body, "plain"))
 
     mime_msg["From"]    = owner
-    mime_msg["To"]      = ", ".join(to)
+    mime_msg["To"]      = ", ".join(cleaned_to)
     mime_msg["Subject"] = subject
     if message_id:
         mime_msg["In-Reply-To"] = message_id
@@ -176,7 +224,7 @@ def send_email(
         payload["threadId"] = thread_id
 
     result = svc.users().messages().send(userId="me", body=payload).execute()
-    print(f"[Gmail] Sent to {to} | id={result.get('id')}")
+    print(f"[Gmail] Sent to {cleaned_to} | id={result.get('id')}")
     return result
 
 

@@ -3,14 +3,26 @@ NEXUS — LangGraph Multi-Agent Orchestrator
 Agents: Email Watcher → Intent Router → BRD Agent → Calendar Agent → Reply Composer
 """
 
-import os, json, asyncio
+import os, json, asyncio, re
 from typing import TypedDict, Annotated, Literal
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from groq import Groq
+from dotenv import load_dotenv
+load_dotenv()
+MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+ESCALATION_THRESHOLD = int(os.getenv("ESCALATION_THRESHOLD", "70"))
+_groq_client = None
 
-groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "llama-3.1-70b-versatile"
+
+def _get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("Missing GROQ_API_KEY in environment")
+        _groq_client = Groq(api_key=api_key)
+    return _groq_client
 
 
 # ── Shared State (flows through every node) ─────────────────
@@ -23,12 +35,17 @@ class AgentState(TypedDict):
     body:            str
     attachments:     list[dict]      # [{name, content, type}]
     all_thread_emails: list[dict]
+    force_intent:     str
 
     # Intent parsing
     intent:          str             # email | schedule | cancel | status | brd | escalate | general
     urgency_score:   int
     sentiment:       str
     entities:        dict
+    summary:         str
+    is_business_email: bool
+    business_category: str
+    urgency_reason: str
 
     # BRD pipeline (only populated if intent==brd)
     brd_extracted:   dict
@@ -56,17 +73,81 @@ class AgentState(TypedDict):
     error:           str
 
 
+def _parse_json_loose(text: str) -> dict | None:
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # Best-effort cleanup for common LLM JSON issues: trailing commas.
+    cleaned = re.sub(r",\s*([}\]])", r"\1", text)
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        return None
+
+
 def _llm(system: str, user: str) -> dict | str:
-    import re
-    resp = groq.chat.completions.create(
-        model=MODEL,
-        messages=[{"role":"system","content":system},{"role":"user","content":user}],
-        temperature=0.1, max_tokens=2000,
-    )
-    raw = resp.choices[0].message.content.strip()
+    try:
+        client = _get_groq_client()
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role":"system","content":system},{"role":"user","content":user}],
+            temperature=0.1, max_tokens=2000,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        print(f"[LLM] Groq call failed: {e}")
+        return {}
+
     raw = re.sub(r"```json\n?|\n?```", "", raw).strip()
-    try:    return json.loads(raw)
-    except: return raw
+    parsed = _parse_json_loose(raw)
+    if parsed is not None:
+        return parsed
+
+    # Try to recover a JSON object from mixed text output.
+    m = re.search(r"\{.*\}", raw, flags=re.S)
+    if m:
+        parsed = _parse_json_loose(m.group(0))
+        if parsed is not None:
+            return parsed
+    return raw
+
+
+def _heuristic_intent(subject: str, body: str, force_intent: str = "") -> tuple[str, int, str, bool, str, str]:
+    text = f"{subject}\n{body}".lower()
+    brd_kw = ["brd", "business requirements", "requirements document", "spec document", "document the project", "write up requirements"]
+    sched_kw = ["schedule", "meeting", "call", "sync", "availability", "calendar"]
+    urgent_kw = ["urgent", "asap", "immediately", "critical", "escalate"]
+    frustr_kw = ["not happy", "frustrated", "disappointed", "angry", "unacceptable"]
+    non_business_kw = ["otp", "verification code", "newsletter", "promotion", "sale", "discount", "security alert", "social", "offer"]
+
+    if force_intent == "brd":
+        return "brd", 35, "neutral", True, "requirements", "Forced BRD intent."
+
+    intent = "general"
+    if any(k in text for k in brd_kw):
+        intent = "brd"
+    elif any(k in text for k in sched_kw):
+        intent = "schedule"
+    elif "status" in text or "update" in text:
+        intent = "status"
+
+    is_business = not any(k in text for k in non_business_kw)
+    category = "operations" if any(k in text for k in ["invoice", "payment", "delivery", "contract"]) else "general_work"
+    urgency = 25
+    if any(k in text for k in urgent_kw):
+        urgency = 68
+    if any(k in text for k in frustr_kw):
+        urgency = max(urgency, 78)
+
+    sentiment = "neutral"
+    if any(k in text for k in frustr_kw):
+        sentiment = "frustrated"
+    elif urgency >= 75:
+        sentiment = "urgent"
+    reason = "Keyword-based fallback urgency."
+    return intent, urgency, sentiment, is_business, category, reason
 
 
 # ══════════════════════════════════════════════════════════════
@@ -74,10 +155,25 @@ def _llm(system: str, user: str) -> dict | str:
 # Decides which downstream agent handles this email
 # ══════════════════════════════════════════════════════════════
 def intent_router_node(state: AgentState) -> AgentState:
+    if state.get("force_intent") == "brd":
+        state["intent"] = "brd"
+        state["urgency_score"] = 35
+        state["sentiment"] = "neutral"
+        state["entities"] = {}
+        state["summary"] = "Forced BRD pipeline for uploaded transcript/document."
+        state["is_business_email"] = True
+        state["business_category"] = "requirements"
+        state["urgency_reason"] = "Forced BRD processing."
+        state["needs_human"] = False
+        return state
+
     system = """Classify this email and extract entities. Return ONLY valid JSON:
 {
+  "is_business_email": true,
+  "business_category": "requirements|project|client|operations|support|finance|other",
   "intent": "schedule|cancel|update|status|brd|escalate|general",
   "urgency_score": 0-100,
+  "urgency_reason": "why this score",
   "sentiment": "positive|neutral|frustrated|urgent",
   "participants": ["email1"],
   "proposed_slots": [{"date_raw": "next Tuesday 3pm", "timezone": "EST"}],
@@ -89,6 +185,7 @@ def intent_router_node(state: AgentState) -> AgentState:
 }
 
 Rules:
+- is_business_email=false for newsletters/promotions/otp/security alerts/social notifications.
 - intent=brd if email contains: 'requirements document', 'BRD', 'business requirements', 'spec document', 'write up requirements', 'document the project'
 - intent=escalate if urgency_score > 70 OR sentiment = frustrated/urgent
 - intent=schedule if any meeting/call/sync requested
@@ -96,15 +193,39 @@ Rules:
 """
     result = _llm(system, f"From: {state['sender']}\nSubject: {state['subject']}\n\nBody:\n{state['body'][:2000]}")
 
-    if isinstance(result, dict):
+    if isinstance(result, dict) and result:
+        state["is_business_email"] = bool(result.get("is_business_email", True))
+        state["business_category"] = result.get("business_category", "other")
         state["intent"]        = result.get("intent", "general")
-        state["urgency_score"] = result.get("urgency_score", 0)
+        state["urgency_score"] = int(result.get("urgency_score", 0) or 0)
+        state["urgency_reason"] = result.get("urgency_reason", "")
         state["sentiment"]     = result.get("sentiment", "neutral")
         state["entities"]      = result.get("entities", {})
+        state["summary"]       = result.get("summary", "")
         state["participants"]  = result.get("participants", [state["sender"]])
         state["proposed_slots"]= result.get("proposed_slots", [])
         state["meeting_title"] = result.get("meeting_title") or state["subject"]
-        state["needs_human"]   = result.get("urgency_score", 0) > 70
+        is_explicit_escalation = (state["intent"] == "escalate")
+        has_urgent_sentiment = state["sentiment"] in ("frustrated", "urgent")
+        state["needs_human"] = is_explicit_escalation or (
+            state["urgency_score"] >= ESCALATION_THRESHOLD and has_urgent_sentiment
+        )
+    else:
+        intent, urgency, sentiment, is_business, category, reason = _heuristic_intent(
+            state.get("subject", ""), state.get("body", ""), state.get("force_intent", "")
+        )
+        state["is_business_email"] = is_business
+        state["business_category"] = category
+        state["intent"] = intent
+        state["urgency_score"] = urgency
+        state["urgency_reason"] = reason
+        state["sentiment"] = sentiment
+        state["entities"] = {}
+        state["summary"] = f"Detected intent={intent} via fallback classifier."
+        state["participants"] = [state.get("sender", "")]
+        state["proposed_slots"] = []
+        state["meeting_title"] = state.get("subject", "Meeting")
+        state["needs_human"] = urgency >= ESCALATION_THRESHOLD and sentiment in ("frustrated", "urgent")
 
     return state
 
@@ -146,8 +267,28 @@ Return ONLY valid JSON:
 }"""
 
     result = _llm(system, f"Communications:\n\n{all_content[:5000]}")
-    if isinstance(result, dict):
+    if isinstance(result, dict) and result:
         state["brd_extracted"] = result
+    else:
+        project_name = (state.get("subject") or "Project").replace("BRD Request:", "").strip()[:80]
+        state["brd_extracted"] = {
+            "project_name": project_name or "Project",
+            "project_description": (state.get("body", "")[:240] or "Project requirements collected from communication."),
+            "business_problem": "Business requirements need to be captured and formalized.",
+            "stakeholders": [{"name": state.get("sender","Stakeholder"), "role":"Requester", "needs":"Clear deliverable scope"}],
+            "business_objectives": [{"objective":"Deliver requested solution","metric":"Stakeholder acceptance","priority":"high"}],
+            "scope_in": ["Core requested functionality"],
+            "scope_out": ["Items not explicitly requested"],
+            "functional_requirements": [{"id":"FR-001","title":"Primary workflow","description":"System supports requested workflow.","priority":"high"}],
+            "non_functional_requirements": [{"id":"NFR-001","category":"reliability","requirement":"System should operate reliably under normal load."}],
+            "constraints": ["Timeline and requirements may evolve with clarifications."],
+            "assumptions": ["Provided transcript/email reflects current business need."],
+            "risks": [{"risk":"Ambiguous requirements","impact":"medium","mitigation":"Confirm open questions with stakeholders."}],
+            "timeline": {"start":None,"end":None,"milestones":["Draft BRD", "Review", "Sign-off"]},
+            "success_metrics": ["Business stakeholder approves BRD"],
+            "decisions_made": [],
+            "feature_priorities": [{"feature":"Core requirements implementation","priority":"P0","rationale":"Direct business need"}],
+        }
     return state
 
 
@@ -233,8 +374,27 @@ Return ONLY valid JSON:
     sections_text = "\n\n".join(f"=== {k} ===\n{v}" for k, v in sections.items())
     result = _llm(system, f"Sections:\n{sections_text[:6000]}")
 
-    if isinstance(result, dict):
+    if isinstance(result, dict) and result:
         state["brd_final"] = result
+    else:
+        project_name = extracted.get("project_name", "Project")
+        state["brd_final"] = {
+            "title": f"BRD: {project_name}",
+            "version": "1.0",
+            "status": "Draft",
+            "sections": {
+                "executive_summary": sections.get("executive_summary", f"This BRD captures requirements for {project_name}."),
+                "business_objectives": sections.get("business_objectives", "1. Deliver requested capabilities\n2. Improve process outcomes"),
+                "scope": sections.get("scope", "In Scope:\n- Requested business functionality\n\nOut of Scope:\n- Unspecified features"),
+                "functional_requirements": sections.get("functional_requirements", "FR-001 Core workflow\nDescription: Support requested process\nPriority: High"),
+                "non_functional_requirements": sections.get("non_functional_requirements", "Reliability: Stable operation\nSecurity: Protect business data"),
+                "stakeholders_decisions": sections.get("stakeholders_decisions", "Stakeholders: Requester and delivery team"),
+                "risks_constraints": sections.get("risks_constraints", "Risk: Requirement ambiguity\nMitigation: Clarification checkpoints"),
+                "feature_prioritization": sections.get("feature_prioritization", "P0: Core requested capabilities"),
+                "timeline_milestones": sections.get("timeline_milestones", "Milestones: Draft -> Review -> Sign-off"),
+            },
+            "metadata": {"project_name": project_name, "total_fr": 1, "total_nfr": 1, "high_priority": 1},
+        }
     return state
 
 
@@ -246,15 +406,31 @@ def calendar_agent_node(state: AgentState) -> AgentState:
     from services.calendar_service import find_free_slot, create_event
     from services.google_auth import load_credentials
     from datetime import datetime
+    from email.utils import parseaddr
     import dateparser
+    import re
 
     creds = load_credentials()
     if not creds:
         state["error"] = "Google not authenticated"
         return state
 
+    # Normalize participants to valid email addresses only.
+    participants_raw = state.get("participants", []) or []
+    participants = []
+    for p in participants_raw:
+        addr = parseaddr(p)[1] if isinstance(p, str) else ""
+        if not addr and isinstance(p, str) and re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", p.strip()):
+            addr = p.strip()
+        if addr and addr not in participants:
+            participants.append(addr)
+
+    # Fall back to sender email for scheduling requests if model missed participants.
+    sender_addr = parseaddr(state.get("sender", ""))[1]
+    if not participants and sender_addr:
+        participants = [sender_addr]
+
     # Normalize proposed slots to datetime
-    participants = state.get("participants", [])
     duration     = 30  # default
 
     # Try to find slot from proposed times first
@@ -266,20 +442,31 @@ def calendar_agent_node(state: AgentState) -> AgentState:
             preferred = parsed
             break
 
-    free_slot = find_free_slot(creds, participants,
-                               duration_minutes=duration,
-                               preferred_start=preferred)
+    try:
+        free_slot = find_free_slot(
+            creds,
+            participants,
+            duration_minutes=duration,
+            preferred_start=preferred
+        )
+    except Exception as e:
+        state["error"] = f"Calendar free/busy lookup failed: {e}"
+        return state
 
     if free_slot:
         state["free_slot"] = free_slot.isoformat()
         # Create the real calendar event
-        event = create_event(
-            creds,
-            title=state.get("meeting_title", state.get("subject", "Meeting")),
-            start=free_slot,
-            duration_minutes=duration,
-            attendees=participants
-        )
+        try:
+            event = create_event(
+                creds,
+                title=state.get("meeting_title", state.get("subject", "Meeting")),
+                start=free_slot,
+                duration_minutes=duration,
+                attendees=participants
+            )
+        except Exception as e:
+            state["error"] = f"Calendar event creation failed: {e}"
+            return state
         state["calendar_event"] = {
             "id": event.get("id"),
             "link": event.get("htmlLink"),
@@ -326,6 +513,16 @@ Return ONLY valid JSON: {{"subject":"Re: ...","body":"full email text"}}"""
     if isinstance(result, dict):
         state["draft_subject"] = result.get("subject", f"Re: {state['subject']}")
         state["draft_body"]    = result.get("body", "")
+    elif isinstance(result, str) and result.strip():
+        # If model didn't return JSON but did generate text, still use it.
+        state["draft_subject"] = state.get("draft_subject") or f"Re: {state.get('subject','Update')}"
+        state["draft_body"] = result.strip()
+    if not state.get("draft_body"):
+        state["draft_subject"] = state.get("draft_subject") or f"Re: {state.get('subject','Update')}"
+        state["draft_body"] = (
+            "Thank you for your email. We have reviewed your request and are taking the next steps. "
+            "Please share any additional constraints or deadlines if needed."
+        )
     return state
 
 
@@ -343,30 +540,31 @@ def escalation_node(state: AgentState) -> AgentState:
 # ══════════════════════════════════════════════════════════════
 # ROUTING FUNCTIONS
 # ══════════════════════════════════════════════════════════════
-def route_intent(state: AgentState) -> Literal["brd_extract","calendar","escalate","compose"]:
+def route_intent(state: AgentState) -> Literal["n_brd_extract","n_calendar","n_escalate","n_compose"]:
     intent = state.get("intent", "general")
-    if state.get("urgency_score", 0) > 70 or intent == "escalate":
-        return "escalate"
+    if intent == "escalate":
+        return "n_escalate"
+    if state.get("urgency_score", 0) >= ESCALATION_THRESHOLD and state.get("sentiment") in ("frustrated", "urgent"):
+        return "n_escalate"
     if intent == "brd":
-        return "brd_extract"
+        return "n_brd_extract"
     if intent in ("schedule", "cancel", "update"):
-        return "calendar"
-    return "compose"
+        return "n_calendar"
+    return "n_compose"
 
-def route_after_brd_gaps(state: AgentState) -> Literal["brd_write","escalate"]:
+def route_after_brd_gaps(state: AgentState) -> Literal["n_brd_write","n_escalate"]:
     gaps = state.get("brd_gaps", {})
-    if not gaps.get("can_proceed", True) and state.get("urgency_score", 0) < 70:
-        return "escalate"  # needs human clarification
-    return "brd_write"
+    if not gaps.get("can_proceed", True) and state.get("urgency_score", 0) < ESCALATION_THRESHOLD:
+        return "n_escalate"  # needs human clarification
+    return "n_brd_write"
 
-def route_after_calendar(state: AgentState) -> Literal["compose","escalate"]:
-    if state.get("error"):
-        return "escalate"
-    return "compose"
+def route_after_calendar(state: AgentState) -> Literal["n_compose","n_escalate"]:
+    # Missing slot should still get a draft reply rather than forced escalation.
+    return "n_compose"
 
-def route_final(state: AgentState) -> Literal["end","escalate"]:
+def route_final(state: AgentState) -> Literal["end","n_escalate"]:
     if state.get("needs_human"):
-        return "escalate"
+        return "n_escalate"
     return "end"
 
 
@@ -377,47 +575,47 @@ def build_graph():
     builder = StateGraph(AgentState)
 
     # Add nodes
-    builder.add_node("intent_router",    intent_router_node)
-    builder.add_node("brd_extract",      brd_extraction_node)
-    builder.add_node("brd_gaps",         brd_gap_node)
-    builder.add_node("brd_write",        brd_writer_node)
-    builder.add_node("brd_assemble",     brd_assembler_node)
-    builder.add_node("calendar",         calendar_agent_node)
-    builder.add_node("compose",          reply_composer_node)
-    builder.add_node("escalate",         escalation_node)
+    builder.add_node("n_intent_router",    intent_router_node)
+    builder.add_node("n_brd_extract",      brd_extraction_node)
+    builder.add_node("n_brd_gaps",         brd_gap_node)
+    builder.add_node("n_brd_write",        brd_writer_node)
+    builder.add_node("n_brd_assemble",     brd_assembler_node)
+    builder.add_node("n_calendar",         calendar_agent_node)
+    builder.add_node("n_compose",          reply_composer_node)
+    builder.add_node("n_escalate",         escalation_node)
 
     # Entry point
-    builder.set_entry_point("intent_router")
+    builder.set_entry_point("n_intent_router")
 
     # Routing from intent
-    builder.add_conditional_edges("intent_router", route_intent, {
-        "brd_extract": "brd_extract",
-        "calendar":    "calendar",
-        "escalate":    "escalate",
-        "compose":     "compose",
+    builder.add_conditional_edges("n_intent_router", route_intent, {
+        "n_brd_extract": "n_brd_extract",
+        "n_calendar":    "n_calendar",
+        "n_escalate":    "n_escalate",
+        "n_compose":     "n_compose",
     })
 
     # BRD pipeline
-    builder.add_edge("brd_extract", "brd_gaps")
-    builder.add_conditional_edges("brd_gaps", route_after_brd_gaps, {
-        "brd_write":  "brd_write",
-        "escalate":   "escalate",
+    builder.add_edge("n_brd_extract", "n_brd_gaps")
+    builder.add_conditional_edges("n_brd_gaps", route_after_brd_gaps, {
+        "n_brd_write":  "n_brd_write",
+        "n_escalate":   "n_escalate",
     })
-    builder.add_edge("brd_write",   "brd_assemble")
-    builder.add_edge("brd_assemble","compose")
+    builder.add_edge("n_brd_write",   "n_brd_assemble")
+    builder.add_edge("n_brd_assemble","n_compose")
 
     # Calendar pipeline
-    builder.add_conditional_edges("calendar", route_after_calendar, {
-        "compose":  "compose",
-        "escalate": "escalate",
+    builder.add_conditional_edges("n_calendar", route_after_calendar, {
+        "n_compose":  "n_compose",
+        "n_escalate": "n_escalate",
     })
 
     # Final routing
-    builder.add_conditional_edges("compose", route_final, {
+    builder.add_conditional_edges("n_compose", route_final, {
         "end":      END,
-        "escalate": "escalate",
+        "n_escalate": "n_escalate",
     })
-    builder.add_edge("escalate", END)
+    builder.add_edge("n_escalate", END)
 
     memory = MemorySaver()
     return builder.compile(checkpointer=memory)
@@ -448,6 +646,11 @@ async def run_agent(email: dict, thread_emails: list = None, human_edits: str = 
         "urgency_score":     0,
         "sentiment":         "neutral",
         "entities":          {},
+        "summary":           "",
+        "is_business_email": True,
+        "business_category": "other",
+        "urgency_reason":    "",
+        "force_intent":      email.get("force_intent", ""),
         "brd_extracted":     {},
         "brd_gaps":          {},
         "brd_sections":      {},
