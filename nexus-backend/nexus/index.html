@@ -6,6 +6,7 @@
 <title>NEXUS — AI Agent Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -320,6 +321,22 @@ code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-family:'DM Mon
     <div class="ch"><div class="card-t">Upcoming calendar events</div><button class="btn btn-g btn-sm" onclick="nav('calendar',null)">→</button></div>
     <div id="dash-events"></div>
   </div>
+
+  <div class="g2" style="margin-top:12px">
+    <div class="card">
+      <div class="ch"><div class="card-t">Channel mix</div><span class="badge b-gr" id="comm-lbl">Live</span></div>
+      <canvas id="chart-comm" height="140"></canvas>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="card-t">Intent breakdown</div><button class="btn btn-g btn-sm" onclick="loadMetrics()">↻</button></div>
+      <canvas id="chart-intent" height="140"></canvas>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="ch"><div class="card-t">Action status</div></div>
+    <canvas id="chart-actions" height="120"></canvas>
+  </div>
 </div>
 
 <!-- ══ INBOX ══ -->
@@ -617,6 +634,7 @@ code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-family:'DM Mon
 <script>
 const API = 'http://localhost:8000';
 let ws = null, state = {actions:[], events:[], emails:[], brds:{}, authenticated:false, brdRunning:{}};
+let charts = {};
 let clusterHints = {};
 let actFilter = 'all';
 
@@ -703,6 +721,7 @@ function log(type, msg) {
                 if(list) list.innerHTML = '<div class="empty">Projects unavailable (backend offline?)</div>';
                 toast('Cannot load projects','warn');
               }
+                renderActionChart();
             }
 
             async function selectProject(p) {
@@ -958,6 +977,7 @@ function updateStats(d) {
   s('s-esc',d.escalations);
   s('s-brd',d.brds||d.brds_generated);
   const aEl=document.getElementById('s-auth'); if(aEl){aEl.textContent=d.authenticated?'✓':'✕'; aEl.style.color=d.authenticated?'var(--grn)':'var(--red)';}
+  renderCommChart(d);
 }
 
 async function loadMetrics() {
@@ -985,6 +1005,9 @@ async function loadMetrics() {
           </div>
           <span style="font-size:10px;color:var(--tx2);font-family:'DM Mono',monospace">${count}</span>
         </div>`).join('') : '<div class="empty" style="padding:14px 0">No actions yet</div>';
+    }
+    if (d.intent_breakdown) {
+      renderIntentChart(d.intent_breakdown);
     }
   } catch(e) { toast('Metrics unavailable', 'warn'); }
 }
@@ -1137,6 +1160,93 @@ function renderDash() {
     '<div class="empty" style="padding:12px 0">No upcoming events — sync calendar</div>';
 }
 
+// ── Charts (Chart.js) ──
+function chartCtx(id){const c=document.getElementById(id);return c?c.getContext('2d'):null;}
+function initChartDefaults(){
+  if(!window.Chart) return;
+  Chart.defaults.color = '#d8dbec';
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+}
+initChartDefaults();
+
+function renderCommChart(stats){
+  if(!window.Chart) return;
+  const ctx = chartCtx('chart-comm'); if(!ctx) return;
+  const data = [
+    stats.processed||stats.emails_processed||0,
+    stats.meetings||0,
+    stats.brds||stats.brds_generated||0,
+    stats.escalations||0
+  ];
+  const labels = ['Emails processed','Meetings created','BRDs generated','Escalations'];
+  const config = {
+    type: 'bar',
+    data: { labels, datasets: [{
+      label: 'Volume', data,
+      backgroundColor: ['#6c5ff5','#00bfa5','#a855f7','#f59f00'],
+      borderRadius: 4
+    }]},
+    options: {
+      responsive: true,
+      plugins: { legend: { display:false }, tooltip:{mode:'index',intersect:false} },
+      scales: {
+        x: { grid:{color:'rgba(255,255,255,0.05)'} },
+        y: { beginAtZero:true, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{precision:0} }
+      }
+    }
+  };
+  if(charts.comm){ charts.comm.data.datasets[0].data = data; charts.comm.update(); }
+  else { charts.comm = new Chart(ctx, config); }
+  const badge=document.getElementById('comm-lbl');
+  if(badge) badge.textContent = `${data.reduce((a,b)=>a+b,0)} signals`;
+}
+
+function renderIntentChart(intent){
+  if(!window.Chart || !intent) return;
+  const ctx = chartCtx('chart-intent'); if(!ctx) return;
+  const entries = Object.entries(intent);
+  const labels = entries.map(([k])=>k);
+  const values = entries.map(([,v])=>v);
+  const colors = ['#6c5ff5','#3b82f6','#00bfa5','#f59f00','#a855f7','#f03e3e'];
+  const data = {
+    labels,
+    datasets: [{
+      label: 'Intents',
+      data: values,
+      backgroundColor: labels.map((_,i)=>colors[i%colors.length])
+    }]
+  };
+  const config = { type:'doughnut', data, options:{ plugins:{ legend:{ position:'bottom' } } } };
+  if(charts.intent){ charts.intent.data = data; charts.intent.update(); }
+  else { charts.intent = new Chart(ctx, config); }
+}
+
+function renderActionChart(){
+  if(!window.Chart) return;
+  const ctx = chartCtx('chart-actions'); if(!ctx) return;
+  const counts = { pending:0, sent:0, escalated:0, rejected:0 };
+  (state.actions||[]).forEach(a=>{
+    if((a.status||'').includes('pending')) counts.pending++;
+    else if(['sent','approved'].includes(a.status)) counts.sent++;
+    else if(a.status==='escalated') counts.escalated++;
+    else if(a.status==='rejected') counts.rejected++;
+  });
+  const labels=['Pending','Sent/Approved','Escalated','Rejected'];
+  const values=[counts.pending,counts.sent,counts.escalated,counts.rejected];
+  const config={
+    type:'bar',
+    data:{ labels, datasets:[{
+      label:'Actions', data:values,
+      backgroundColor:['#f59f00','#00bfa5','#f03e3e','#7e86a0'],
+      borderRadius:4
+    }]},
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'}}, y:{grid:{color:'rgba(255,255,255,0.05)'}}} }
+  };
+  if(charts.actions){ charts.actions.data.datasets[0].data = values; charts.actions.update(); }
+  else { charts.actions = new Chart(ctx, config); }
+}
+
 let selectedInboxIds = new Set();
 function rebuildClusterHints() {
   clusterHints = {};
@@ -1253,6 +1363,19 @@ function renderActions() {
           <div class="ac-meta">${ib(a.intent)}${sb(a.status)}<span style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace">${FT(a.created_at)}</span>
             <div style="display:flex;align-items:center;gap:4px"><div style="width:36px;height:3px;background:var(--bg5);border-radius:2px;overflow:hidden"><div style="height:100%;width:${a.urgency||0}%;background:${UC(a.urgency||0)}"></div></div><span style="font-size:9px;color:${UC(a.urgency||0)}">${a.urgency||0}</span></div>
           </div>
+            ${a.project_suggestion ? `
+            <div style="margin-top:6px;background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;padding:8px;font-size:10px;color:var(--tx2)">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="badge b-gn">Project Suggestion</span>
+                <span style="font-weight:600;color:var(--a2)">${a.project_suggestion.project_name||'Project'}</span>
+                <span style="font-size:9px;color:var(--tx3)">conf: ${a.project_suggestion.confidence||0}</span>
+                <span style="font-size:9px;color:var(--tx3)">${a.project_suggestion.reason||''}</span>
+              </div>
+              <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-grn btn-sm" onclick="event.stopPropagation();applyProjectSuggestion('${a.email?.id}', '${a.project_suggestion.project_id}')">✓ Attach to Project</button>
+                <button class="btn btn-g btn-sm" onclick="event.stopPropagation();createProjectAndAttach('${a.email?.id}', '${(a.project_suggestion.project_name||'New Project').replace(/'/g, "\\'")}')">+ New Project from Name</button>
+              </div>
+            </div>` : ''}
         </div>
       </div>
       ${isEscalated?`<div class="ac-body"><div style="background:var(--rdim);border:1px solid rgba(240,62,62,.2);border-radius:var(--rs);padding:9px;font-size:11px;color:var(--red)">▲ Urgency ${a.urgency}/100 — LangGraph escalated. Please respond manually.</div></div><div class="ac-foot"><a href="https://mail.google.com" target="_blank" class="btn btn-a btn-sm">Open Gmail</a><button class="btn btn-g btn-sm" onclick="resolveEsc('${a.id}')">✓ Resolve</button></div>`:''}
@@ -1269,6 +1392,44 @@ function renderActions() {
       <div class="ac-foot">${footerControls}</div>` : 
       (!isEscalated&&!isCluster?`<div class="ac-body"><span style="font-size:10px;color:var(--tx3)">Status: ${a.status}</span></div>`:'')}
     </div>`}).join('');
+}
+
+async function applyProjectSuggestion(emailId, projectId) {
+  if(!emailId || !projectId) return toast('Missing email or project','warn');
+  try {
+    const res = await fetch(`${API}/api/projects/${projectId}/attach_email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email_id: emailId })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error) throw new Error(data.error || 'Attach failed');
+    toast('Email attached to project','ok');
+    loadActions();
+    loadProjects();
+    updateCounters();
+  } catch (e) {
+    console.error(e);
+    toast('Failed to attach email','warn');
+  }
+}
+
+async function createProjectAndAttach(emailId, nameHint) {
+  const name = prompt('Project name', nameHint || 'New Project');
+  if(!name) return;
+  try {
+    const res = await fetch(`${API}/api/projects`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ name })
+    });
+    const proj = await res.json();
+    if(!res.ok || proj.error || !proj.id) throw new Error(proj.error || 'Create failed');
+    await applyProjectSuggestion(emailId, proj.id);
+  } catch(e) {
+    console.error(e);
+    toast('Failed to create project','warn');
+  }
 }
 
 function filterAct(f,el) {

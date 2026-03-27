@@ -292,30 +292,30 @@ def brd_extraction_node(state: AgentState) -> AgentState:
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
     cleaned_content = clean_noisy_content(all_content)
-    context_to_process = cleaned_content[:8000]
+    context_to_process = cleaned_content[:12000]
 
-    system = """You are a senior business analyst. Extract ALL requirements from these communications.
-Return ONLY valid JSON:
+    system = """You are a senior business analyst. Synthesize multi-email context into a single canonical BRD dataset.
+Return ONLY valid JSON with grounded, non-hedged content (no "maybe", no placeholders). If data is missing, use an empty list/field instead of guessing. Deduplicate near-duplicates and keep IDs sequential.
 {
-  "project_name": "string",
-  "project_description": "2-3 sentences",
-  "business_problem": "string",
-  "stakeholders": [{"name":"","role":"","needs":""}],
-  "business_objectives": [{"objective":"","metric":"","priority":"high|medium|low"}],
-  "scope_in": ["item"],
-  "scope_out": ["item"],
-  "functional_requirements": [{"id":"FR-001","title":"","description":"","priority":"high|medium|low"}],
-  "non_functional_requirements": [{"id":"NFR-001","category":"performance|security|scalability|usability","requirement":""}],
-  "constraints": ["string"],
-  "assumptions": ["string"],
-  "risks": [{"risk":"","impact":"high|medium|low","mitigation":""}],
-  "timeline": {"start":null,"end":null,"milestones":[]},
-  "success_metrics": ["string"],
-  "decisions_made": ["string"],
-  "feature_priorities": [{"feature":"","priority":"P0|P1|P2","rationale":""}]
+    "project_name": "concise project name inferred from themes and subjects",
+    "project_description": "2-3 crisp sentences on goals, users, and outcome",
+    "business_problem": "specific pain being solved",
+    "stakeholders": [{"name":"","role":"","needs":""}],
+    "business_objectives": [{"objective":"","metric":"","priority":"high|medium|low"}],
+    "scope_in": ["what is included"],
+    "scope_out": ["what is excluded"],
+    "functional_requirements": [{"id":"FR-001","title":"","description":"actionable user story style","priority":"high|medium|low","source":"email|thread|doc"}],
+    "non_functional_requirements": [{"id":"NFR-001","category":"performance|security|scalability|usability","requirement":"measurable SLO/SLA style","priority":"high|medium|low"}],
+    "constraints": ["explicit constraints or dependencies"],
+    "assumptions": ["assumptions that were stated or implied"],
+    "risks": [{"risk":"","impact":"high|medium|low","mitigation":""}],
+    "timeline": {"start":null,"end":null,"milestones":[{"name":"","date":""}]},
+    "success_metrics": ["measurable KPIs"],
+    "decisions_made": ["key decisions or approvals"],
+    "feature_priorities": [{"feature":"","priority":"P0|P1|P2","rationale":"why"}]
 }"""
 
-    result = _llm(system, f"Communications:\n\n{context_to_process}")
+    result = _llm(system, f"Communications (chronological, cleaned):\n\n{context_to_process}")
     if isinstance(result, dict) and result:
         state["brd_extracted"] = result
     else:
@@ -359,8 +359,12 @@ def brd_gap_node(state: AgentState) -> AgentState:
     return state
 
 async def _generate_brd_section(project_name: str, section_key: str, section_desc: str, extracted: dict) -> str:
-    system = f"You are a Business Analyst. Write the '{section_key}' section for '{project_name}'. {section_desc}. Return ONLY the text content."
-    user = f"Context: {json.dumps(extracted, indent=2)[:3000]}"
+    system = (
+        f"You are a senior Business Analyst. Write the '{section_key}' section for '{project_name}'. "
+        f"{section_desc}. Use only grounded details from context; no placeholders or guesses. "
+        "Be concise, bullet where possible, and highlight any critical risks or decisions that affect this section."
+    )
+    user = f"Context: {json.dumps(extracted, indent=2)[:3200]}"
     res = await asyncio.get_event_loop().run_in_executor(None, _llm, system, user)
     return str(res) if res else "Context unavailable for this section."
 
@@ -369,24 +373,24 @@ async def brd_writer_node(state: AgentState) -> AgentState:
     project_name = extracted.get("project_name", state.get("subject", "Project")).replace("BRD:", "").strip()
     ctx = json.dumps(extracted, indent=2)[:4000]
 
-    system = f"""You are a Lead Business Analyst. Create a FINAL Business Requirements Document for '{project_name}'.
+    system = f"""You are a Lead Business Analyst. Produce a professional BRD ready for executives and engineers. Be concise, actionable, and avoid fluff. Use bullet lists and numbered items; no placeholders like TBD unless explicitly absent.
 Return ONLY valid JSON with this EXACT structure:
 {{
-  "title": "BRD: {project_name}",
-  "version": "1.0",
-  "status": "Draft",
-  "sections": {{
-    "executive_summary": "High-level overview...",
-    "business_objectives": "3-5 SMART goals...",
-    "scope": "In-Scope, Out-of-Scope, Assumptions...",
-    "functional_requirements": "FR table...",
-    "non_functional_requirements": "Performance, Security...",
-    "stakeholders_decisions": "Stakeholders list...",
-    "risks_constraints": "Risk matrix...",
-    "feature_prioritization": "MoSCoW...",
-    "timeline_milestones": "Milestones..."
-  }},
-  "metadata": {{ "project_name": "{project_name}" }}
+    "title": "BRD: {project_name}",
+    "version": "1.0",
+    "status": "Draft",
+    "sections": {{
+        "executive_summary": "2-4 bullet lines covering goal, users, value, and current pain",
+        "business_objectives": "SMART objectives with target metrics",
+        "scope": "Two subsections: In-Scope (bullets) and Out-of-Scope (bullets) plus key assumptions",
+        "functional_requirements": "Numbered FR list with ID, title, description, priority, and acceptance note",
+        "non_functional_requirements": "NFR list grouped by category (performance, security, availability, privacy, UX) with measurable thresholds",
+        "stakeholders_decisions": "Stakeholder roles + major decisions/approvals captured",
+        "risks_constraints": "Risk table style: risk, impact, mitigation, owners; include constraints/dependencies",
+        "feature_prioritization": "MoSCoW or P0/P1/P2 grouping with rationale",
+        "timeline_milestones": "Milestones with target dates or relative weeks; include next immediate step"
+    }},
+    "metadata": {{ "project_name": "{project_name}" }}
 }}"""
 
     loop = asyncio.get_event_loop()

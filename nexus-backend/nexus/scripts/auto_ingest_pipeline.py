@@ -10,12 +10,13 @@ from typing import Callable, Awaitable, Optional
 
 import services.db_service as db_service
 from services.parsers import MultiModalParsers
+from services.ingestion_enhancer import enhancer
 
 INGEST_ROOT = Path(os.getenv("INGEST_ROOT", "data/ingest")).resolve()
 POLL_SECONDS = int(os.getenv("INGEST_POLL_SECONDS", "30"))
 SKIP_HINTS = ("enron", "ami", "sample", "dataset")
 
-# Shared state for introspection
+# Shared state for introspection and manual reset
 seen_paths: set[str] = set()
 last_run: Optional[float] = None
 last_ingested: list[dict] = []
@@ -45,6 +46,17 @@ async def scan_once(
         try:
             raw = path.read_bytes()
             parsed = MultiModalParsers.from_upload(raw, path.name, path.stem)
+            cleaned_text, noise_score, is_noise = enhancer.preprocess_noise(parsed.get("clean_text", ""))
+            if is_noise:
+                seen_paths.add(key)
+                skipped += 1
+                if broadcaster:
+                    await broadcaster({
+                        "type": "log",
+                        "level": "info",
+                        "msg": f"Skipped noisy file {path.name} (score={noise_score:.2f})",
+                    })
+                continue
             project_name = path.parent.name or "Ingested Project"
             project = db_service.get_project_by_name(project_name)
             if not project:
@@ -55,10 +67,17 @@ async def scan_once(
                 continue
 
             doc_type = parsed.get("source_type", "document")
-            db_service.add_document(project_id, path.name, parsed.get("clean_text", ""), doc_type)
+            content = cleaned_text or parsed.get("clean_text", "")
+            db_service.add_document(project_id, path.name, content, doc_type)
             seen_paths.add(key)
             added += 1
-            last_ingested.append({"project_id": project_id, "project_name": project_name, "filename": path.name, "doc_type": doc_type})
+            last_ingested.append({
+                "project_id": project_id,
+                "project_name": project_name,
+                "filename": path.name,
+                "doc_type": doc_type,
+                "noise_score": noise_score,
+            })
             if broadcaster:
                 await broadcaster({
                     "type": "log",
@@ -83,6 +102,12 @@ def ingest_status() -> dict:
         "last_run": last_run,
         "last_ingested": last_ingested[-5:],
     }
+
+
+def ingest_reset() -> dict:
+    seen_paths.clear()
+    last_ingested.clear()
+    return {"reset": True, "seen": 0}
 
 
 async def auto_ingest_loop(

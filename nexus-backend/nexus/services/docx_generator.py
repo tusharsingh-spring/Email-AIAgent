@@ -64,7 +64,13 @@ def generate_docx(brd: dict, path: str = "BRD.docx") -> str:
 
     for key, title in SECTIONS:
         content = brd.get("sections", {}).get(key, "")
-        if not content: continue
+        if isinstance(content, dict):
+            # Flatten dict sections into readable lines
+            content = "\n".join([f"{k}: {v}" for k, v in content.items()])
+        if isinstance(content, list):
+            content = "\n".join([str(item) for item in content])
+        if not content: 
+            continue
 
         h = doc.add_heading(level=1); h.clear()
         r = h.add_run(title)
@@ -72,7 +78,7 @@ def generate_docx(brd: dict, path: str = "BRD.docx") -> str:
         r.font.color.rgb=RGBColor(0x1a,0x1a,0x2e)
         doc.add_paragraph()
 
-        for line in content.strip().split("\n"):
+        for line in str(content).strip().split("\n"):
             line = line.rstrip()
             if not line: doc.add_paragraph(); continue
             if line.startswith(("- ","• ","* ")):

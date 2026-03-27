@@ -16,9 +16,11 @@ from services.calendar_service import get_upcoming_events, delete_event
 from services.docx_generator import generate_docx
 from services.clustering_service import ProjectClusteringAgent
 from services.parsers import MultiModalParsers
+from services.ingestion_enhancer import enhancer
+from services.multi_channel_fetcher import MultiChannelFetcher
 from agents.graph            import run_agent
 import services.db_service as db_service
-from scripts.auto_ingest_pipeline import auto_ingest_loop, scan_once, ingest_status
+from scripts.auto_ingest_pipeline import auto_ingest_loop, scan_once, ingest_status, ingest_reset
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +55,8 @@ store = {
 MAX_EMAIL_FETCH = int(os.getenv("MAX_EMAIL_FETCH", "5"))
 AUTO_SEND_REPLIES = os.getenv("AUTO_SEND_REPLIES", "true").lower() in ("1", "true", "yes", "on")
 
+multi_channel_fetcher = MultiChannelFetcher()
+
 BUSINESS_DOMAIN_ALLOWLIST = {
     d.strip().lower()
     for d in os.getenv("BUSINESS_DOMAIN_ALLOWLIST", "").split(",")
@@ -66,6 +70,56 @@ BUSINESS_KEYWORDS = {
     "project", "client", "requirement", "brd", "business", "proposal", "invoice", "contract",
     "meeting", "schedule", "timeline", "deliverable", "sow", "kickoff", "milestone"
 }
+
+
+# ── Project suggestion (lightweight heuristic) ───────────────
+def suggest_project_for_email(email: dict) -> dict | None:
+    """Suggest an existing project for this email based on name/token overlap."""
+    try:
+        projects = db_service.get_projects()
+    except Exception:
+        return None
+    if not projects:
+        return None
+
+    subj = (email.get("subject") or "").lower()
+    body = (email.get("body") or "").lower()
+    text = subj + "\n" + body
+
+    def score_project(p: dict) -> tuple[int, str]:
+        name = (p.get("name") or "").lower()
+        desc = (p.get("description") or "").lower()
+        score = 0
+        reason_bits = []
+        if name and name in subj:
+            score += 5; reason_bits.append("name in subject")
+        if name and name in body:
+            score += 3; reason_bits.append("name in body")
+        tokens = {t for t in re.split(r"[^a-z0-9]+", name) if len(t) >= 4}
+        if tokens:
+            overlap = len(tokens & set(re.split(r"[^a-z0-9]+", text)))
+            if overlap:
+                score += overlap
+                reason_bits.append(f"token overlap {overlap}")
+        if desc and desc in text:
+            score += 1; reason_bits.append("desc match")
+        return score, ", ".join(reason_bits)
+
+    best = None
+    for p in projects:
+        s, why = score_project(p)
+        if s >= 3 and (best is None or s > best[0]):
+            best = (s, why, p)
+
+    if not best:
+        return None
+    score, why, proj = best
+    return {
+        "project_id": proj.get("id"),
+        "project_name": proj.get("name"),
+        "confidence": score,
+        "reason": why or "overlap"
+    }
 
 
 # ── WebSocket broadcast ────────────────────────────────────
@@ -284,6 +338,9 @@ async def process_email(email: dict, thread_emails_override: list = None):
             "msg":f"Skipped non-business email: {email.get('subject','(no subject)')}"})
         return
 
+    # Project suggestion (for mapping UI)
+    project_suggestion = suggest_project_for_email(email)
+
     action = {
         "id":          email["id"],
         "thread_id":   email["thread_id"],
@@ -303,6 +360,7 @@ async def process_email(email: dict, thread_emails_override: list = None):
         "brd_docx_path": None,
         "brd_job_id":    None,
         "created_at":    datetime.utcnow().isoformat(),
+        "project_suggestion": project_suggestion,
     }
 
     # If BRD was generated — save and generate DOCX
@@ -529,7 +587,22 @@ async def manual_group_process(req: ClusterRequest):
         return {"error": "No matching emails found in current inbox batch. Fetch first."}
     
     title = req.title or "User Override Cluster"
-    composite_body = "\n\n---\n\n".join([f"EMAIL REF:\nSubject: {d['subject']}\n{d.get('body','')}" for d in selected_emails])
+    email_blocks = []
+    for idx, d in enumerate(selected_emails, 1):
+        email_blocks.append(
+            "\n".join([
+                f"EMAIL {idx} — Subject: {d.get('subject','(no subject)')}",
+                f"From: {d.get('sender','')} | Date: {d.get('date','')}",
+                "Key Content:",
+                (d.get('body','') or '')[:1800]
+            ])
+        )
+
+    composite_body = (
+        f"PROJECT THEME: {title}\n"
+        "Goal: Merge these communications into a single, consistent BRD. Resolve contradictions and keep only business-relevant details.\n\n"
+        + "\n\n--- EMAIL BOUNDARY ---\n\n".join(email_blocks)
+    )
     
     mock_cluster_email = {
         "id": f"cluster_{uuid.uuid4().hex[:8]}",
@@ -970,6 +1043,53 @@ async def list_brds():
 
 
 # ══════════════════════════════════════════════════════════════
+# MULTI-CHANNEL FETCH & NOISE UTILITIES
+# ══════════════════════════════════════════════════════════════
+@app.get("/api/multi-channel/fetch")
+async def fetch_multi_channel():
+    items = multi_channel_fetcher.fetch_all_channels()
+    return {"items": items, "total": len(items)}
+
+
+@app.post("/api/multi-channel/ingest")
+async def ingest_multi_channel(request: Request):
+    payload = await request.json()
+    project_name = payload.get("project_name", "Multi-Channel Ingest") if isinstance(payload, dict) else "Multi-Channel Ingest"
+    items = multi_channel_fetcher.fetch_all_channels()
+    project = db_service.get_project_by_name(project_name) or db_service.create_project(project_name, "Auto-created for multi-channel ingest")
+    project_id = project.get("id")
+    added = 0
+    skipped = 0
+    for item in items:
+        cleaned, noise_score, is_noise = enhancer.preprocess_noise(item.get("content", ""))
+        if is_noise:
+            skipped += 1
+            continue
+        doc_type = "email" if item.get("source") == "Gmail" else "meeting" if item.get("source") == "Fireflies.ai" else "chat"
+        subject = item.get("subject") or f"{item.get('source','External')} item"
+        db_service.add_document(project_id, subject, cleaned or item.get("content", ""), doc_type)
+        added += 1
+    return {"project_id": project_id, "added": added, "skipped_noise": skipped, "fetched": len(items)}
+
+
+@app.post("/api/tools/noise-score")
+async def noise_score_tool(request: Request):
+    payload = await request.json()
+    text = payload.get("text", "") if isinstance(payload, dict) else ""
+    cleaned, score, is_noise = enhancer.preprocess_noise(text)
+    chunks = enhancer.chunk_text(cleaned)
+    entities = enhancer.extract_entities(cleaned) if cleaned else {}
+    return {
+        "cleaned_text": cleaned,
+        "noise_score": score,
+        "is_noise": is_noise,
+        "chunks": chunks,
+        "chunks_count": len(chunks),
+        "entities": entities,
+    }
+
+
+# ══════════════════════════════════════════════════════════════
 # INGEST CONTROL
 # ══════════════════════════════════════════════════════════════
 @app.get("/api/ingest/status")
@@ -981,6 +1101,11 @@ async def ingest_status_endpoint():
 async def ingest_scan_now():
     stats = await scan_once(broadcast)
     return stats
+
+
+@app.post("/api/ingest/reset")
+async def ingest_reset_endpoint():
+    return ingest_reset()
 
 
 # ══════════════════════════════════════════════════════════════

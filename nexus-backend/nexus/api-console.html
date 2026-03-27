@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS API Console</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d14;
+      --panel: #111624;
+      --bdr: #1f2a3d;
+      --txt: #e6e9f5;
+      --muted: #8b94ad;
+      --accent: #6c5ff5;
+      --ok: #3ecf8e;
+      --warn: #f59f00;
+      --err: #ef4444;
+      --r: 10px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", sans-serif; background: var(--bg); color: var(--txt); }
+    header { padding: 16px 20px; border-bottom: 1px solid var(--bdr); display: flex; justify-content: space-between; align-items: center; }
+    h1 { margin: 0; font-size: 18px; letter-spacing: 0.4px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--bdr); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .card h3 { margin: 0; font-size: 14px; letter-spacing: 0.2px; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input, textarea { width: 100%; background: #0b1222; border: 1px solid var(--bdr); border-radius: 6px; color: var(--txt); padding: 8px; font-size: 13px; }
+    textarea { min-height: 70px; resize: vertical; }
+    button { border: none; background: var(--accent); color: #fff; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-weight: 600; letter-spacing: 0.2px; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .result { font-family: "Consolas", monospace; font-size: 12px; background: #0b1222; border: 1px solid var(--bdr); border-radius: 8px; padding: 10px; min-height: 60px; white-space: pre-wrap; word-break: break-word; }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .status { font-size: 12px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--bdr); background: #0d1322; }
+    .pill.ok { color: var(--ok); border-color: rgba(62, 207, 142, 0.3); }
+    .pill.warn { color: var(--warn); border-color: rgba(245, 159, 0, 0.3); }
+    .pill.err { color: var(--err); border-color: rgba(239, 68, 68, 0.35); }
+    footer { text-align: center; padding: 12px; color: var(--muted); font-size: 12px; }
+    .flex { display: flex; gap: 8px; align-items: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>NEXUS API Console</h1>
+      <div class="muted">Quick manual calls for the FastAPI backend</div>
+    </div>
+    <div id="auth-pill" class="pill warn">Auth: unknown</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="flex" style="justify-content: space-between; align-items: center; gap: 10px;">
+        <h3>Auth status</h3>
+        <a href="http://127.0.0.1:8000/auth/login" target="_blank" style="color: var(--accent); font-size: 12px; text-decoration: none;">Login ↗</a>
+      </div>
+      <button onclick="call('GET','/auth/status')">Check</button>
+      <div id="auth-status" class="result">—</div>
+    </section>
+
+    <section class="card">
+      <h3>Emails</h3>
+      <div class="row">
+        <div>
+          <label>Limit</label>
+          <input id="emails-limit" type="number" value="5" min="1" />
+        </div>
+        <div>
+          <label>Email ID (for fetch/process)</label>
+          <input id="email-id" placeholder="abc123" />
+        </div>
+      </div>
+      <div class="flex">
+        <button onclick="listEmails()">List</button>
+        <button onclick="getEmail()">Get</button>
+        <button onclick="processEmail()">Process</button>
+      </div>
+      <button style="margin-top:4px" onclick="call('GET','/api/emails/unassigned')">Unassigned</button>
+      <div id="emails-result" class="result">—</div>
+    </section>
+
+    <section class="card">
+      <h3>Actions</h3>
+      <div class="row">
+        <div>
+          <label>Action ID</label>
+          <input id="action-id" placeholder="action-uuid" />
+        </div>
+        <div>
+          <label>Draft body (approve)</label>
+          <textarea id="action-body" placeholder="Optional custom body"></textarea>
+        </div>
+      </div>
+      <div class="flex">
+        <button onclick="call('GET','/api/actions')">List</button>
+        <button onclick="approveAction()">Approve</button>
+        <button onclick="rejectAction()">Reject</button>
+      </div>
+      <button style="margin-top:4px" onclick="call('GET','/api/actions/sections')">Grouped sections</button>
+      <div id="actions-result" class="result">—</div>
+    </section>
+
+    <section class="card">
+      <h3>Projects</h3>
+      <div class="row">
+        <div>
+          <label>Project ID</label>
+          <input id="project-id" placeholder="project-uuid" />
+        </div>
+        <div>
+          <label>Project name (create)</label>
+          <input id="project-name" placeholder="New Project" />
+        </div>
+        <div>
+          <label>Email ID to attach</label>
+          <input id="attach-email-id" placeholder="email-uuid" />
+        </div>
+      </div>
+      <div class="flex">
+        <button onclick="call('GET','/api/projects')">List</button>
+        <button onclick="createProject()">Create</button>
+        <button onclick="attachEmail()">Attach email</button>
+      </div>
+      <div class="flex">
+        <button onclick="projectContext()">Context</button>
+        <button onclick="projectBRD()">Generate BRD</button>
+      </div>
+      <div id="projects-result" class="result">—</div>
+    </section>
+
+    <section class="card">
+      <h3>BRD</h3>
+      <div class="row">
+        <div>
+          <label>Job ID</label>
+          <input id="brd-id" placeholder="job-id" />
+        </div>
+      </div>
+      <div class="flex">
+        <button onclick="call('GET','/api/brd/list')">List</button>
+        <button onclick="call('GET', `/api/brd/${val('brd-id')}/sections`)"">Sections</button>
+        <button onclick="downloadBRD()">Download</button>
+      </div>
+      <div id="brd-result" class="result">—</div>
+    </section>
+
+    <section class="card">
+      <h3>Metrics & ingest</h3>
+      <div class="flex">
+        <button onclick="call('GET','/api/stats')">Stats</button>
+        <button onclick="call('GET','/api/metrics')">Metrics</button>
+        <button onclick="call('GET','/api/summary')">Summary</button>
+      </div>
+      <div class="flex">
+        <button onclick="call('GET','/api/ingest/status')">Ingest status</button>
+        <button onclick="call('POST','/api/ingest/scan')">Scan now</button>
+        <button onclick="call('POST','/api/ingest/reset')">Reset ingest</button>
+      </div>
+      <div id="metrics-result" class="result">—</div>
+    </section>
+  </main>
+
+  <footer>Backend base URL: http://127.0.0.1:8000 · Uses fetch, no dependencies</footer>
+
+  <script>
+    const BASE = 'http://127.0.0.1:8000';
+    const pill = document.getElementById('auth-pill');
+
+    function setResult(id, data) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (data instanceof Response) {
+        el.textContent = `HTTP ${data.status}`;
+        return;
+      }
+      try { el.textContent = JSON.stringify(data, null, 2); }
+      catch { el.textContent = String(data); }
+    }
+    function val(id) { return document.getElementById(id)?.value?.trim() || ''; }
+
+    async function call(method, path, body, target = 'metrics-result') {
+      try {
+        const res = await fetch(`${BASE}${path}`, {
+          method,
+          headers: body ? { 'Content-Type': 'application/json' } : undefined,
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const txt = res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text();
+        setResult(target, txt);
+        return { res, txt };
+      } catch (e) {
+        setResult(target, { error: e.message });
+        return { error: e };
+      }
+    }
+
+    // Auth status on load
+    (async () => {
+      const { res, txt } = await call('GET', '/auth/status', null, 'auth-status');
+      const ok = res && res.status === 200 && txt && txt.authenticated !== false;
+      pill.textContent = ok ? `Auth: ${txt.email || 'connected'}` : 'Auth: not connected';
+      pill.className = `pill ${ok ? 'ok' : 'warn'}`;
+    })();
+
+    async function listEmails() {
+      const limit = Number(val('emails-limit')) || 5;
+      await call('GET', `/api/emails?limit=${limit}`, null, 'emails-result');
+    }
+    async function getEmail() {
+      const id = val('email-id'); if (!id) return setResult('emails-result', { error: 'Provide email_id' });
+      await call('GET', `/api/emails/${id}`, null, 'emails-result');
+    }
+    async function processEmail() {
+      const id = val('email-id'); if (!id) return setResult('emails-result', { error: 'Provide email_id' });
+      await call('POST', `/api/emails/process/${id}`, null, 'emails-result');
+    }
+
+    async function approveAction() {
+      const id = val('action-id'); if (!id) return setResult('actions-result', { error: 'Provide action_id' });
+      const body = val('action-body');
+      await call('POST', `/api/actions/${id}/approve`, body ? { body } : {}, 'actions-result');
+    }
+    async function rejectAction() {
+      const id = val('action-id'); if (!id) return setResult('actions-result', { error: 'Provide action_id' });
+      await call('POST', `/api/actions/${id}/reject`, null, 'actions-result');
+    }
+
+    async function createProject() {
+      const name = val('project-name') || 'New Project';
+      await call('POST', '/api/projects', { name }, 'projects-result');
+    }
+    async function attachEmail() {
+      const pid = val('project-id');
+      const eid = val('attach-email-id') || val('email-id');
+      if (!pid || !eid) return setResult('projects-result', { error: 'Provide project_id and email_id' });
+      await call('POST', `/api/projects/${pid}/attach_email`, { email_id: eid }, 'projects-result');
+    }
+    async function projectContext() {
+      const pid = val('project-id'); if (!pid) return setResult('projects-result', { error: 'Provide project_id' });
+      await call('GET', `/api/projects/${pid}/context`, null, 'projects-result');
+    }
+    async function projectBRD() {
+      const pid = val('project-id'); if (!pid) return setResult('projects-result', { error: 'Provide project_id' });
+      await call('POST', `/api/projects/${pid}/generate-brd`, null, 'projects-result');
+    }
+
+    async function downloadBRD() {
+      const id = val('brd-id'); if (!id) return setResult('brd-result', { error: 'Provide job_id' });
+      const url = `${BASE}/api/brd/${id}/download`;
+      window.open(url, '_blank');
+      setResult('brd-result', { info: 'Opened download in new tab', url });
+    }
+  </script>
+</body>
+</html>
