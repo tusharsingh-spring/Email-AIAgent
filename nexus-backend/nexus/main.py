@@ -842,7 +842,15 @@ async def add_project(data: dict):
 
 @app.get("/api/emails/unassigned")
 async def get_unassigned():
-    return {"emails": db_service.get_unassigned_emails()}
+    emails = db_service.get_unassigned_emails()
+    # Enrich each email with an AI project suggestion for the UI dropdown
+    for em in emails:
+        try:
+            em["project_suggestion"] = suggest_project_for_email(em)
+        except Exception:
+            em["project_suggestion"] = None
+    return {"emails": emails}
+
 
 @app.post("/api/projects/{project_id}/assign-email")
 @app.post("/api/projects/{project_id}/attach_email")

@@ -800,9 +800,21 @@ code{
 
 <!-- ══ BRD UPLOAD ══ -->
 <div class="page" id="page-brd-upload">
-  <div class="ph"><div class="pt">Upload Transcript</div><div class="ps">Upload a meeting transcript, chat log, or email thread — NEXUS generates a full BRD</div></div>
+  <div class="ph"><div class="pt">Upload Resources</div><div class="ps">Upload a meeting transcript or chat log — link it to a project and NEXUS folds it into the BRD context</div></div>
   <div class="g2">
     <div>
+      <!-- Project Selector for uploads -->
+      <div class="card" style="margin-bottom:12px;background:var(--adim);border-color:rgba(10,132,255,0.3)">
+        <div class="card-t" style="color:var(--a)">📂 Link to Project</div>
+        <div class="field" style="margin:0">
+          <label style="font-size:10px;color:var(--tx3)">Select project this resource belongs to</label>
+          <select id="upload-project-select" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:8px 10px;color:var(--tx);font-size:12px;outline:none;cursor:pointer">
+            <option value="">— No project (standalone BRD) —</option>
+          </select>
+        </div>
+        <div id="upload-project-hint" style="font-size:10px;color:var(--tx3);margin-top:6px">When a project is selected, the resource is saved to that project's context in Supabase.</div>
+      </div>
+
       <div class="card" style="margin-bottom:12px">
         <div class="card-t">Upload file</div>
         <div class="dz" id="dz" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
@@ -815,7 +827,11 @@ code{
       </div>
       <div class="card">
         <div class="card-t">Or paste directly</div>
-        <textarea id="paste-tx" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:9px;color:var(--tx);font-size:11px;font-family:'DM Sans',sans-serif;outline:none;min-height:110px;resize:vertical;transition:.12s" placeholder="Paste transcript here...
+        <div class="field" style="margin-bottom:8px">
+          <label style="font-size:10px;color:var(--tx3)">Resource label (optional)</label>
+          <input type="text" id="paste-label" placeholder="e.g. Q1 Kickoff Meeting" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:8px 10px;color:var(--tx);font-size:12px;outline:none"/>
+        </div>
+        <textarea id="paste-tx" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:9px;color:var(--tx);font-size:11px;font-family:'DM Sans',sans-serif;outline:none;min-height:110px;resize:vertical;transition:.12s" placeholder="Paste transcript or chat log here...
 
 [10:00] PM: We need a user auth system with SSO by Q2
 [10:02] CTO: Must handle 10k concurrent users, 99.9% uptime
@@ -823,30 +839,17 @@ code{
 [10:08] PM: Budget $150k, GDPR compliance required"></textarea>
         <button class="btn btn-a btn-full" style="margin-top:8px" onclick="pasteTx()">
           <div class="spin" id="tx-spin" style="display:none"></div>
-          Generate BRD from transcript
+          <span id="paste-btn-label">Save to Project / Generate BRD</span>
         </button>
       </div>
     </div>
     <div class="card">
       <div class="card-t">Agent progress</div>
-      <div id="brd-progress">
-        <div class="prog-step" id="ps-ingestion"><div class="ps-d idle"></div><div class="ps-l idle">Ingestion — cleaning inputs</div></div>
-        <div class="prog-step" id="ps-extraction"><div class="ps-d idle"></div><div class="ps-l idle">Extraction — stakeholders, requirements</div></div>
-        <div class="prog-step" id="ps-gap_detection"><div class="ps-d idle"></div><div class="ps-l idle">Gap detection — finding missing info</div></div>
-        <div class="prog-step" id="ps-writing"><div class="ps-d idle"></div><div class="ps-l idle">Section writers — 9 sections parallel</div></div>
-        <div class="prog-step" id="ps-assembly"><div class="ps-d idle"></div><div class="ps-l idle">Assembler — consistency check</div></div>
-        <div class="prog-step" id="ps-docx"><div class="ps-d idle"></div><div class="ps-l idle">DOCX export</div></div>
-      </div>
-      <div id="brd-result-preview" style="margin-top:12px"></div>
-    </div>
-  </div>
-</div>
-
 <!-- ══ UNASSIGNED INBOX ══ -->
   <div id="page-inbox" class="page">
     <div class="ph">
       <h1 class="pt">Unassigned Inbox</h1>
-      <p class="ps">Incoming business emails awaiting project classification.</p>
+      <p class="ps">Assign each email to a project — the AI suggests the best match, you confirm with the dropdown.</p>
     </div>
     <div class="card">
         <div class="ch">
@@ -865,52 +868,92 @@ code{
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
           <h1 class="pt">Project Intelligence</h1>
-          <p class="ps">Consolidated business requirements and project context.</p>
+          <p class="ps">Consolidated emails, transcripts and chat logs per project — generate BRD in one click.</p>
         </div>
         <button class="btn btn-a" onclick="openNewProjectModal()">+ New Project</button>
       </div>
     </div>
-    
-    <div class="g2">
-      <div id="project-list" class="card" style="padding:0;overflow:hidden">
-          <div class="empty">No projects found. Create one to begin.</div>
-      </div>
-      <div id="project-detail" class="card" style="display:none;min-height:400px">
-         <div class="ch">
-            <h2 class="card-t" id="pd-name">Project Details</h2>
-            <div class="tb-right" id="pd-actions"></div>
-         </div>
-         <div class="tabs">
-            <div class="tab on" onclick="setProjTab('context', this)">Project Context</div>
-            <div class="tab" onclick="setProjTab('brd', this)">Generated BRD</div>
-         </div>
-<div id="pd-context" style="display:block">
-            <div class="nav-grp" style="padding-left:0; color:var(--blu)">Linked Emails</div>
-            <div id="pd-emails" class="empty" style="padding:10px 0; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word;">
-                0 emails linked.
-            </div>
 
-            <div class="nav-grp" style="margin-top:20px; padding-left:0; color:var(--pur)">Meeting Transcripts & Docs</div>
-            <div id="pd-docs" class="empty" style="padding:10px 0; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word;">
-                0 documents uploaded.
+    <div class="g2">
+      <!-- Left: project list -->
+      <div id="project-list" class="card" style="padding:0;overflow:hidden">
+        <div class="empty">No projects found. Create one to begin.</div>
+      </div>
+
+      <!-- Right: project detail -->
+      <div id="project-detail" class="card" style="display:none;min-height:400px">
+        <div class="ch">
+          <h2 class="card-t" id="pd-name">Project Details</h2>
+          <div style="display:flex;gap:6px" id="pd-actions">
+            <button class="btn btn-a" id="pd-brd-btn" onclick="generateProjectBRD(activeProjectId)">⚡ Generate BRD</button>
+          </div>
+        </div>
+        <div class="tabs">
+          <div class="tab on" onclick="setProjTab('context',this)">Context</div>
+          <div class="tab" onclick="setProjTab('brd',this)">Generated BRD</div>
+        </div>
+
+        <!-- Context tab -->
+        <div id="pd-context" style="display:block;padding:12px 0">
+          <div style="font-size:10px;color:var(--blu);font-weight:600;letter-spacing:.5px;margin-bottom:6px">LINKED EMAILS</div>
+          <div id="pd-emails" style="max-height:240px;overflow-y:auto">
+            <div class="empty" style="padding:12px 0">No emails linked yet.</div>
+          </div>
+
+          <div style="font-size:10px;color:var(--pur);font-weight:600;letter-spacing:.5px;margin-top:18px;margin-bottom:6px">TRANSCRIPTS &amp; DOCUMENTS</div>
+          <div id="pd-docs" style="max-height:240px;overflow-y:auto">
+            <div class="empty" style="padding:12px 0">No documents uploaded yet.</div>
+          </div>
+
+          <!-- Add resource strip -->
+          <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:var(--rs);border:1px dashed var(--bdr2)">
+            <div style="font-size:10px;color:var(--tx3);margin-bottom:8px;letter-spacing:.4px">ADD RESOURCE TO PROJECT</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <input type="file" id="pd-upload-file" style="display:none" onchange="uploadProjectDoc(activeProjectId, event)"/>
+              <button class="btn btn-g btn-sm" onclick="document.getElementById('pd-upload-file').click()">📎 Upload Transcript/PDF</button>
+              <button class="btn btn-g btn-sm" onclick="openPasteModal(activeProjectId)">✏ Paste Transcript</button>
+              <button class="btn btn-g btn-sm" onclick="openAssignEmailModal(activeProjectId)">✉ Assign Email</button>
             </div>
-            
-            <div class="card" style="margin-top:20px;border-style:dashed;background:transparent">
-                <div class="card-t" style="font-size:10px;color:var(--tx3)">ADD RESOURCE</div>
-                <div style="display:flex;gap:6px">
-                    <input type="file" id="pd-upload-file" style="display:none" onchange="uploadProjectDoc(activeProjectId, event)"/>
-                    <button class="btn btn-g btn-sm btn-full" onclick="document.getElementById('pd-upload-file').click()">📎 Upload Transcript/PDF</button>
-                    <button class="btn btn-g btn-sm btn-full" onclick="showAttachResources(activeProjectId)">✉ Link Email ID</button>
-                </div>
-            </div>
-         </div>
-         </div>
-         <div id="pd-brd-view" style="display:none">
-            <div id="pd-brd-content" class="brd-content" style="max-height:unset;height:600px"></div>
-         </div>
+          </div>
+        </div>
+
+        <!-- BRD tab -->
+        <div id="pd-brd-view" style="display:none">
+          <div id="pd-brd-content" class="brd-content" style="max-height:unset;height:540px"></div>
+          <div style="margin-top:8px;display:flex;gap:6px" id="pd-brd-dl"></div>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- ══ PASTE TRANSCRIPT MODAL ══ -->
+  <div id="paste-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);align-items:center;justify-content:center">
+    <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);padding:24px;width:520px;max-width:92vw">
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px">📋 Paste Transcript / Chat Log</div>
+      <div class="field">
+        <label style="font-size:10px;color:var(--tx3)">Label (e.g. Q1 Kickoff Meeting)</label>
+        <input type="text" id="modal-paste-label" placeholder="Meeting label" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:8px 10px;color:var(--tx);font-size:12px;outline:none"/>
+      </div>
+      <textarea id="modal-paste-body" rows="9" style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:9px;color:var(--tx);font-size:11px;outline:none;resize:vertical;margin-top:8px" placeholder="[10:00] PM: We need a user auth system with SSO by Q2&#10;[10:02] CTO: Must handle 10k users, 99.9% uptime&#10;[10:05] Designer: Mobile-first..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button class="btn btn-g" onclick="document.getElementById('paste-modal').style.display='none'">Cancel</button>
+        <button class="btn btn-a" onclick="submitPasteToProject()">Save to Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ASSIGN EMAIL MODAL ══ -->
+  <div id="assign-email-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);align-items:center;justify-content:center">
+    <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);padding:24px;width:520px;max-width:92vw">
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px">✉ Assign Unassigned Email</div>
+      <div style="font-size:10px;color:var(--tx3);margin-bottom:10px">Select an email from the triage queue to link to this project.</div>
+      <div id="assign-email-list" style="max-height:320px;overflow-y:auto"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button class="btn btn-g" onclick="document.getElementById('assign-email-modal').style.display='none'">Close</button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- ══ METRICS ══ -->
 <div class="page" id="page-metrics">
@@ -1122,55 +1165,73 @@ function log(type, msg) {
                         <div class="ac-from">${p.name||'Project'}</div>
                         <div class="ac-sub">${p.status||''} • Created ${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</div>
                       </div>
-                      <button class="btn btn-a btn-sm" data-brd-btn="${p.id}" onclick="event.stopPropagation(); generateProjectBRD('${p.id}')">⚡ Generate BRD</button>
                     </div>
-                    <div style="font-size:10px;color:var(--tx3);margin-top:6px" id="brd-status-${p.id}"></div>
+                    <div style="font-size:10px;color:var(--tx3);margin-top:4px" id="brd-status-${p.id}"></div>
                   `;
                   list.appendChild(div);
                 });
                 renderProjectsRunning();
+                await populateProjectDropdowns(projects);
               } catch (e) {
                 if(list) list.innerHTML = '<div class="empty">Projects unavailable (backend offline?)</div>';
                 toast('Cannot load projects','warn');
               }
-                renderActionChart();
+              renderActionChart();
             }
 
             async function selectProject(p) {
                 activeProjectId = p.id;
                 document.getElementById('project-detail').style.display = 'block';
                 document.getElementById('pd-name').textContent = p.name;
-                
-                // Load context
-                const res = await fetch(`/api/projects/${p.id}/context`);
-                const ctx = await res.json();
 
-                // Inject Emails into Top Section
-                const emails = (ctx.emails||[]).map(e=>`
-                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:6px;margin-bottom:8px; word-wrap: break-word;">
-                        <div style="font-size:10px;color:var(--tx3)">From: ${e.sender||''}</div>
-                        <div style="font-size:11px;font-weight:600;margin:2px 0">${e.subject||'(no subject)'}</div>
-                        <div style="font-size:10px;color:var(--tx2);white-space:pre-wrap">${(e.body||'').slice(0,200)}...</div>
-                    </div>
-                `).join('') || '<div class="empty">No linked emails yet.</div>';
-                document.getElementById('pd-emails').innerHTML = emails;
-                
-                // Inject Transcripts into Bottom Section
-                const docs = (ctx.documents||[]).map(d=>`
-                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:6px;margin-bottom:8px; word-wrap: break-word;">
-                        <div style="font-size:11px;font-weight:600;color:var(--pur)">${d.filename}</div>
-                        <div style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace">${d.type||'document'}</div>
-                        <div style="font-size:10px;color:var(--tx2);white-space:pre-wrap;margin-top:4px">${(d.content||'').slice(0,200)}...</div>
-                    </div>
-                `).join('') || '<div class="empty">No transcripts yet.</div>';
-                document.getElementById('pd-docs').innerHTML = docs;
-                
-              // Show BRD generation button
-              document.getElementById('pd-actions').innerHTML = `
-                <button class="btn btn-a btn-sm" data-brd-btn="${p.id}" onclick="generateProjectBRD('${p.id}')">⚡ Generate BRD</button>
-                <div style="font-size:10px;color:var(--tx3);margin-top:6px" id="brd-status-${p.id}"></div>
-              `;
-              renderProjectsRunning();
+                // Reset tabs to context
+                setProjTab('context', document.querySelector('#project-detail .tab'));
+
+                // Load context from Supabase
+                try {
+                  const res = await fetch(`${API}/api/projects/${p.id}/context`);
+                  const ctx = await res.json();
+
+                  const emails = (ctx.emails||[]);
+                  const emailHtml = emails.length ? emails.map(e=>`
+                    <div style="padding:10px;border:1px solid var(--bdr);background:var(--bg3);border-radius:8px;margin-bottom:8px">
+                      <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+                        <div>
+                          <div style="font-size:10px;color:var(--tx3)">From: ${e.sender||''}</div>
+                          <div style="font-size:11px;font-weight:600;margin:2px 0">${e.subject||'(no subject)'}</div>
+                          <div style="font-size:10px;color:var(--tx2)">${(e.body||'').slice(0,160)}...</div>
+                        </div>
+                      </div>
+                    </div>`).join('') : '<div class="empty" style="padding:12px 0">No emails linked yet.</div>';
+                  document.getElementById('pd-emails').innerHTML = emailHtml;
+
+                  const docs = (ctx.documents||[]);
+                  const docsHtml = docs.length ? docs.map(d=>`
+                    <div style="padding:10px;border:1px solid var(--bdr);background:rgba(191,90,242,.06);border-left:3px solid var(--pur);border-radius:8px;margin-bottom:8px">
+                      <div style="font-size:11px;font-weight:600;color:var(--pur)">${d.filename}</div>
+                      <div style="font-size:9px;color:var(--tx3);font-family:'DM Mono',monospace;margin-bottom:4px">[${(d.type||'doc').toUpperCase()}]</div>
+                      <div style="font-size:10px;color:var(--tx2)">${(d.content||'').slice(0,180)}...</div>
+                    </div>`).join('') : '<div class="empty" style="padding:12px 0">No transcripts uploaded yet.</div>';
+                  document.getElementById('pd-docs').innerHTML = docsHtml;
+
+                  // Show existing BRD if available
+                  try {
+                    const brdRes = await fetch(`${API}/api/projects/${p.id}/brd`);
+                    const brdData = await brdRes.json();
+                    if(brdData.brd && brdData.brd.content) {
+                      const sections = brdData.brd.content.sections || {};
+                      const sectionText = Object.entries(sections).map(([k,v])=>`<b>${k.replace(/_/g,' ').toUpperCase()}</b>\n${v}`).join('\n\n---\n\n');
+                      document.getElementById('pd-brd-content').textContent = sectionText;
+                      const dlDiv = document.getElementById('pd-brd-dl');
+                      if(dlDiv) dlDiv.innerHTML = `<span style="font-size:10px;color:var(--grn)">✓ BRD exists — regenerate to refresh</span>`;
+                    }
+                  } catch(e2){}
+
+                } catch(e) {
+                  document.getElementById('pd-emails').innerHTML = '<div class="empty">Could not load context.</div>';
+                }
+
+                renderProjectsRunning();
             }
             async function generateProjectBRD(id) {
               try {
@@ -1243,24 +1304,158 @@ function log(type, msg) {
                 }
             }
 
+            // ─── Project Dropdowns (shared cache) ───────────────────────
+            let _projectCache = [];
+
+            async function populateProjectDropdowns(projects) {
+              _projectCache = projects || [];
+              const selectors = ['upload-project-select'];
+              selectors.forEach(id => {
+                const sel = document.getElementById(id);
+                if(!sel) return;
+                const curr = sel.value;
+                sel.innerHTML = '<option value="">— No project (standalone BRD) —</option>';
+                _projectCache.forEach(p => {
+                  const opt = document.createElement('option');
+                  opt.value = p.id;
+                  opt.textContent = p.name;
+                  sel.appendChild(opt);
+                });
+                if(curr) sel.value = curr;
+              });
+            }
+
+            // ─── Paste Transcript Modal ──────────────────────────────────
+            let _pasteTargetProjectId = null;
+            function openPasteModal(projectId) {
+              _pasteTargetProjectId = projectId;
+              document.getElementById('modal-paste-label').value = '';
+              document.getElementById('modal-paste-body').value = '';
+              document.getElementById('paste-modal').style.display = 'flex';
+            }
+
+            async function submitPasteToProject() {
+              const label = document.getElementById('modal-paste-label').value.trim() || 'Transcript';
+              const body  = document.getElementById('modal-paste-body').value.trim();
+              if(!body){ toast('Paste some content first','warn'); return; }
+              const pid = _pasteTargetProjectId;
+              if(!pid){ toast('No project selected','warn'); return; }
+              try {
+                const blob = new Blob([body], {type:'text/plain'});
+                const fd = new FormData();
+                fd.append('file', blob, label + '.txt');
+                const res = await fetch(`${API}/api/projects/${pid}/upload-doc`, {method:'POST', body:fd});
+                if(res.ok) {
+                  toast('✓ Transcript saved to project','ok');
+                  document.getElementById('paste-modal').style.display = 'none';
+                  const p = _projectCache.find(x=>x.id===pid) || {id:pid,name:'Project'};
+                  selectProject(p);
+                } else {
+                  toast('Upload failed','warn');
+                }
+              } catch(e){ toast('Error: ' + e.message,'warn'); }
+            }
+
+            // ─── Assign Email Modal ──────────────────────────────────────
+            let _assignTargetProjectId = null;
+            async function openAssignEmailModal(projectId) {
+              _assignTargetProjectId = projectId;
+              const listEl = document.getElementById('assign-email-list');
+              listEl.innerHTML = '<div class="empty">Loading unassigned emails...</div>';
+              document.getElementById('assign-email-modal').style.display = 'flex';
+              try {
+                const d = await (await fetch(`${API}/api/emails/unassigned`)).json();
+                const emails = d.emails || [];
+                if(!emails.length){ listEl.innerHTML = '<div class="empty">No unassigned emails.</div>'; return; }
+                listEl.innerHTML = emails.map(e => `
+                  <div style="padding:10px;border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+                    <div style="flex:1">
+                      <div style="font-size:11px;font-weight:600">${e.subject||'(no subject)'}</div>
+                      <div style="font-size:10px;color:var(--tx3)">${e.sender||''}</div>
+                    </div>
+                    <button class="btn btn-a btn-sm" onclick="assignEmailFromModal('${e.id}','${(e.subject||'').replace(/'/g,'\\\'')}')">
+                      Assign →
+                    </button>
+                  </div>`).join('');
+              } catch(e){ listEl.innerHTML = '<div class="empty">Error loading emails.</div>'; }
+            }
+
+            async function assignEmailFromModal(emailId, emailSubject) {
+              const pid = _assignTargetProjectId;
+              if(!pid) return;
+              try {
+                const res = await fetch(`${API}/api/projects/${pid}/attach_email`, {
+                  method:'POST', headers:{'Content-Type':'application/json'},
+                  body: JSON.stringify({email_id: emailId})
+                });
+                if(res.ok){
+                  toast(`✓ "${emailSubject.slice(0,40)}" linked to project`,'ok');
+                  document.getElementById('assign-email-modal').style.display='none';
+                  const p = _projectCache.find(x=>x.id===pid) || {id:pid,name:'Project'};
+                  selectProject(p);
+                } else { toast('Link failed','warn'); }
+              } catch(e){ toast('Error: '+e.message,'warn'); }
+            }
+
+            // ─── Upload project doc ──────────────────────────────────────
+            async function uploadProjectDoc(projectId, event) {
+              const file = event.target.files[0];
+              if(!file || !projectId) return;
+              try {
+                const fd = new FormData();
+                fd.append('file', file);
+                toast('Uploading ' + file.name + '...','ok');
+                const res = await fetch(`${API}/api/projects/${projectId}/upload-doc`, {method:'POST', body:fd});
+                if(res.ok){
+                  toast('✓ ' + file.name + ' saved to project','ok');
+                  const p = _projectCache.find(x=>x.id===projectId) || {id:projectId,name:'Project'};
+                  selectProject(p);
+                } else { toast('Upload failed','warn'); }
+              } catch(e){ toast('Error: '+e.message,'warn'); }
+            }
+
+            // ─── Inbox with project-selector dropdown ────────────────────
             async function loadUnassignedEmails() {
                 try {
                     log('info', 'Fetching unassigned emails...');
+                    // Ensure project cache is warm
+                    if(!_projectCache.length) {
+                      const pr = await fetch(`${API}/api/projects`);
+                      const pd = await pr.json();
+                      _projectCache = pd.projects || [];
+                    }
                     const d = await (await fetch(`${API}/api/emails/unassigned`)).json();
                     const listEl = document.getElementById('unassigned-email-list');
                     listEl.innerHTML = '';
                     if (d.emails && d.emails.length > 0) {
                         d.emails.forEach(email => {
+                            const suggestion = email.project_suggestion;
+                            const projectOpts = _projectCache.map(p =>
+                              `<option value="${p.id}" ${suggestion && suggestion.project_id===p.id ? 'selected' : ''}>${p.name}</option>`
+                            ).join('');
+                            const suggestBadge = suggestion
+                              ? `<div style="font-size:9px;color:var(--grn);margin-top:3px">🤖 AI suggests: <b>${suggestion.project_name}</b> (confidence ${suggestion.confidence})</div>`
+                              : '';
                             const div = document.createElement('div');
                             div.className = 'ac';
+                            div.id = `inbox-email-${email.id}`;
                             div.innerHTML = `
-                                <div class="ac-h">
-                                    <div class="ac-av">${email.from_name ? email.from_name[0] : '?' }</div>
-                                    <div style="flex:1">
-                                        <div class="ac-from">${email.from_name || email.from_email}</div>
-                                        <div class="ac-sub">${email.subject}</div>
-                                    </div>
-                                    <button class="btn btn-sm btn-g" onclick="assignEmailToProject('${email.id}')">Assign</button>
+                                <div class="ac-h" style="flex-wrap:wrap;gap:6px">
+                                  <div class="ac-av">${(email.sender||'?')[0].toUpperCase()}</div>
+                                  <div style="flex:1;min-width:0">
+                                    <div class="ac-from" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${email.sender||'Unknown'}</div>
+                                    <div class="ac-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${email.subject||'(no subject)'}</div>
+                                    ${suggestBadge}
+                                  </div>
+                                </div>
+                                <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+                                  <select id="proj-sel-${email.id}" style="flex:1;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--rs);padding:6px 8px;color:var(--tx);font-size:11px;outline:none">
+                                    <option value="">— Select project —</option>
+                                    ${projectOpts}
+                                  </select>
+                                  <button class="btn btn-a btn-sm" onclick="assignEmailDropdown('${email.id}')">
+                                    Assign →
+                                  </button>
                                 </div>
                             `;
                             listEl.appendChild(div);
@@ -1276,28 +1471,27 @@ function log(type, msg) {
                 }
             }
 
-            async function assignEmailToProject(emailId) {
-                const projectId = prompt("Enter Project ID to assign this email to:");
-                if (!projectId) return;
-
+            async function assignEmailDropdown(emailId) {
+                const sel = document.getElementById(`proj-sel-${emailId}`);
+                const projectId = sel ? sel.value : '';
+                if(!projectId){ toast('Select a project first','warn'); return; }
                 try {
-                    const res = await fetch(`/api/projects/${projectId}/attach_email`, {
+                    const res = await fetch(`${API}/api/projects/${projectId}/attach_email`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email_id: emailId })
                     });
                     if (res.ok) {
-                        toast('Email assigned to project successfully!', 'ok');
-                        loadUnassignedEmails(); // Refresh the unassigned list
-                        updateCounters(); // Update badge
+                        toast('✓ Email assigned to project!', 'ok');
+                        log('ok', `Email ${emailId} assigned to project ${projectId}`);
+                        const card = document.getElementById(`inbox-email-${emailId}`);
+                        if(card){ card.style.opacity='0.4'; card.style.pointerEvents='none'; }
+                        updateCounters();
                     } else {
-                        const errorData = await res.json();
-                        toast(`Failed to assign email: ${errorData.detail || res.statusText}`, 'warn');
+                        const err = await res.json();
+                        toast(`Failed: ${err.detail||res.statusText}`, 'warn');
                     }
-                } catch (e) {
-                    toast('Error assigning email.', 'warn');
-                    console.error('Error assigning email:', e);
-                }
+                } catch (e) { toast('Error: ' + e.message, 'warn'); }
             }
 
 function handle(msg) {
@@ -1480,33 +1674,62 @@ async function cancelEvent(id) {
   catch(e){}
 }
 
-/* ── BRD upload ── */
+/* ── BRD upload (Upload Resources page) ── */
 async function uploadFile(e) {
   const file = e.target.files[0]; if(!file) return;
+  const projectId = document.getElementById('upload-project-select')?.value || '';
   const fd = new FormData(); fd.append('file', file);
   try {
-    log('info',`Uploading ${file.name} for BRD generation...`);
-    const r = await fetch(`${API}/api/brd/from-upload`,{method:'POST',body:fd});
-    const d = await r.json();
-    toast('Processing — BRD generation started','ok');
-    log('ok','BRD pipeline triggered via LangGraph');
-    startBRDProgressAnim();
+    if(projectId) {
+      // Save to specific project's documents table
+      log('info',`Saving ${file.name} to project ${projectId}...`);
+      const r = await fetch(`${API}/api/projects/${projectId}/upload-doc`,{method:'POST',body:fd});
+      if(r.ok){
+        toast('✓ Saved to project — use Generate BRD from the Project page','ok');
+        log('ok',`${file.name} saved to project ${projectId}`);
+        document.getElementById('upload-project-hint').textContent = '✓ Saved! Go to Projects → select project → Generate BRD.';
+        document.getElementById('upload-project-hint').style.color = 'var(--grn)';
+      } else { toast('Upload failed','warn'); }
+    } else {
+      // Standalone BRD generation (no project context)
+      log('info',`Uploading ${file.name} for standalone BRD...`);
+      const r = await fetch(`${API}/api/brd/from-upload`,{method:'POST',body:fd});
+      toast('Processing — BRD generation started','ok');
+      log('ok','BRD pipeline triggered via LangGraph');
+      startBRDProgressAnim();
+    }
   } catch(e){ toast('Backend not running','warn'); demoProgress(); }
 }
 
 async function pasteTx() {
   const content = document.getElementById('paste-tx').value.trim();
+  const label   = document.getElementById('paste-label')?.value.trim() || 'Transcript';
+  const projectId = document.getElementById('upload-project-select')?.value || '';
   if(!content){ toast('Paste some content first','warn'); return; }
   document.getElementById('tx-spin').style.display='block';
   const blob = new Blob([content],{type:'text/plain'});
-  const fd = new FormData(); fd.append('file', blob, 'transcript.txt');
+  const fd = new FormData(); fd.append('file', blob, label + '.txt');
   try {
-    const r = await fetch(`${API}/api/brd/from-upload`,{method:'POST',body:fd});
-    document.getElementById('tx-spin').style.display='none';
-    toast('BRD generation started','ok');
-    startBRDProgressAnim();
+    if(projectId) {
+      // Save to specific project context
+      const r = await fetch(`${API}/api/projects/${projectId}/upload-doc`,{method:'POST',body:fd});
+      document.getElementById('tx-spin').style.display='none';
+      if(r.ok){
+        toast('✓ Transcript saved to project — go to Projects to generate BRD','ok');
+        document.getElementById('paste-tx').value = '';
+        document.getElementById('paste-btn-label').textContent = '✓ Saved to Project!';
+        setTimeout(()=>{ document.getElementById('paste-btn-label').textContent = 'Save to Project / Generate BRD'; }, 3000);
+      } else { toast('Save failed','warn'); }
+    } else {
+      // Standalone BRD
+      const r = await fetch(`${API}/api/brd/from-upload`,{method:'POST',body:fd});
+      document.getElementById('tx-spin').style.display='none';
+      toast('BRD generation started','ok');
+      startBRDProgressAnim();
+    }
   } catch(e){ document.getElementById('tx-spin').style.display='none'; toast('Backend not running — showing demo','warn'); demoProgress(); }
 }
+
 
 function handleDrop(e) {
   e.preventDefault(); document.getElementById('dz').classList.remove('drag');
