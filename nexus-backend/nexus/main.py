@@ -2,7 +2,7 @@
 NEXUS — FastAPI Main
 Email Listener + LangGraph Agent + BRD Pipeline + Calendar + WebSocket
 """
-import asyncio, json, os, uuid, tempfile
+import asyncio, json, os, uuid, tempfile, re
 from email.utils import parseaddr
 from contextlib import asynccontextmanager
 from datetime import datetime
