@@ -42,6 +42,14 @@ def get_project_by_name(name: str) -> Optional[Dict]:
     res = db.table("projects").select("*").eq("name", name).limit(1).execute()
     return (res.data or [None])[0]
 
+def delete_project(project_id: str):
+    """Remove project and detach related records."""
+    db = get_db()
+    db.table("documents").delete().eq("project_id", project_id).execute()
+    db.table("brds").delete().eq("project_id", project_id).execute()
+    db.table("emails").update({"project_id": None}).eq("project_id", project_id).execute()
+    db.table("projects").delete().eq("id", project_id).execute()
+
 # --- Emails ---
 def upsert_emails(emails: List[Dict]):
     """Sync a batch of Gmail messages to the DB."""

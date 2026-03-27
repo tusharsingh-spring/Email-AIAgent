@@ -277,10 +277,15 @@ async def process_cluster_batch(emails: list[dict]):
             "draft_body":  "Pending human approval to trigger BRD Extractor...",
             "created_at":  datetime.utcnow().isoformat()
         }
-        
-        store["actions"].insert(0, action)
-        await broadcast({"type": "new_action", "payload": action})
-        await broadcast({"type":"log", "level":"warn", "msg":f"Cluster '{theme}' sent to UI for human approval."})
+
+        existing_cluster = next((a for a in store["actions"] if a.get("status") == "pending_cluster" and set(a.get("email_ids", [])) == set(action.get("email_ids", []))), None)
+        if existing_cluster:
+            existing_cluster.update(action)
+            existing_cluster["updated_at"] = datetime.utcnow().isoformat()
+        else:
+            store["actions"].insert(0, action)
+            await broadcast({"type": "new_action", "payload": action})
+            await broadcast({"type":"log", "level":"warn", "msg":f"Cluster '{theme}' sent to UI for human approval."})
 
 async def process_email(email: dict, thread_emails_override: list = None):
     """Run LangGraph agent on one cohesive simulated or real email, then broadcast result."""
@@ -404,21 +409,30 @@ async def process_email(email: dict, thread_emails_override: list = None):
         await broadcast({"type":"meeting_created",
                          "meeting": result["calendar_event"]})
 
-    store["actions"].insert(0, action)
+    existing_action = next((a for a in store["actions"] if a.get("id") == action["id"]), None)
+    final_action = action
+    if existing_action:
+        existing_action.update(action)
+        existing_action["updated_at"] = datetime.utcnow().isoformat()
+        final_action = existing_action
+    else:
+        store["actions"].insert(0, action)
+
+    store["summaries"] = [s for s in store["summaries"] if s.get("email_id") != email.get("id")]
     store["summaries"].insert(0, {
         "email_id": email.get("id"),
         "subject": email.get("subject", ""),
         "intent": intent,
         "urgency": urgency,
-        "status": action["status"],
-        "summary": action.get("summary", ""),
-        "created_at": action["created_at"],
+        "status": final_action["status"],
+        "summary": final_action.get("summary", ""),
+        "created_at": final_action["created_at"],
     })
     store["summaries"] = store["summaries"][:500]
-    msg_type = "escalation" if action["status"]=="escalated" else "new_action"
-    await broadcast({"type": msg_type, "payload": action})
-    await broadcast({"type":"log","level":"ok" if action["status"]!="escalated" else "error",
-        "msg":f"Action Logged: {email.get('subject')} | status={action['status']}"})
+    msg_type = "escalation" if final_action["status"]=="escalated" else "new_action"
+    await broadcast({"type": msg_type, "payload": final_action})
+    await broadcast({"type":"log","level":"ok" if final_action["status"]!="escalated" else "error",
+        "msg":f"Action Logged: {email.get('subject')} | status={final_action['status']}"})
 
     proj_id = email.get("project_id")
     if proj_id:
@@ -630,9 +644,59 @@ async def manual_group_process(req: ClusterRequest):
 # ══════════════════════════════════════════════════════════════
 # ACTIONS (agent queue)
 # ══════════════════════════════════════════════════════════════
+from datetime import datetime
+
+def _ts(action: dict):
+    raw = action.get("updated_at") or action.get("created_at") or ""
+    try:
+        return datetime.fromisoformat(raw)
+    except Exception:
+        return datetime.min
+
+STATUS_PRIORITY = {
+    "pending": 0,
+    "pending_cluster": 0,
+    "processing_brd": 1,
+    "sent": 2,
+    "approved": 2,
+    "rejected": 2,
+    "escalated": 3,
+}
+
+
+def dedup_actions():
+    latest = {}
+
+    # Keep the freshest version per key (cluster signature or id)
+    for a in store["actions"]:
+        if a.get("status") == "pending_cluster":
+            key = ("cluster", tuple(sorted(a.get("email_ids") or [])))
+        else:
+            key = ("id", a.get("id"))
+
+        if key not in latest:
+            latest[key] = a
+            continue
+
+        current = latest[key]
+        ts_new = _ts(a)
+        ts_old = _ts(current)
+        pri_new = STATUS_PRIORITY.get(a.get("status"), 5)
+        pri_old = STATUS_PRIORITY.get(current.get("status"), 5)
+
+        # Pick newer timestamp; if equal, prefer lower priority (non-escalated beats escalated)
+        if ts_new > ts_old or (ts_new == ts_old and pri_new < pri_old):
+            latest[key] = a
+
+    # Return most recent first
+    deduped = sorted(latest.values(), key=_ts, reverse=True)
+    store["actions"] = deduped
+    return deduped
+
+
 @app.get("/api/actions")
 async def list_actions(status: str = None):
-    actions = store["actions"]
+    actions = dedup_actions()
     if status: actions = [a for a in actions if a["status"]==status]
     return {"actions": actions}
 
@@ -643,7 +707,7 @@ async def list_actions_by_sections():
     Sections include dynamic intent buckets plus escalation.
     """
     grouped = {}
-    for action in store["actions"]:
+    for action in dedup_actions():
         section = action.get("section") or (
             "escalation" if action.get("status") == "escalated" else action.get("intent", "general")
         )
@@ -667,7 +731,7 @@ async def get_pending_clusters():
             "summary": a.get("summary"),
             "created_at": a.get("created_at"),
         }
-        for a in store["actions"] if a.get("status") == "pending_cluster"
+        for a in dedup_actions() if a.get("status") == "pending_cluster"
     ]
     return {"clusters": clusters, "count": len(clusters)}
 
@@ -693,7 +757,7 @@ async def approve_action(action_id: str, body: dict = {}):
         
         # 1. Create the persistent project in Supabase
         proj_name = action.get("project_name", "New Project")
-        p = db_service.create_project(proj_name, action["summary"])
+        p = db_service.create_project(proj_name, action.get("summary", ""))
         project_id = p.get("id")
         
         # 2. Link all emails to this project
@@ -847,6 +911,15 @@ async def add_project(data: dict):
     p = db_service.create_project(name, desc)
     await broadcast({"type":"log","level":"ok","msg":f"Project '{name}' created in DB."})
     return p
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: str):
+    try:
+        db_service.delete_project(project_id)
+        await broadcast({"type":"log","level":"warn","msg":f"Project '{project_id}' deleted."})
+        return {"status": "deleted", "project_id": project_id}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/api/emails/unassigned")
 async def get_unassigned():

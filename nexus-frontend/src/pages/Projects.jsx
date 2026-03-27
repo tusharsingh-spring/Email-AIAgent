@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { getProjects, createProject, getProjectEmails, getProjectDocuments, getProjectBRD, generateProjectBRD, uploadProjectDoc, attachEmail, getUnassignedEmails, downloadBrd } from '../services/api'
+import { getProjects, createProject, deleteProject, getProjectEmails, getProjectDocuments, getProjectBRD, generateProjectBRD, uploadProjectDoc, attachEmail, getUnassignedEmails, downloadBrd } from '../services/api'
 import { FolderPlus, Loader2 } from 'lucide-react'
 
 // Subcomponents
@@ -78,6 +78,19 @@ export default function Projects() {
     setBrdRunning(r => { const n = { ...r }; delete n[id]; return n })
   }
 
+  const handleDeleteProject = async () => {
+    if (!active) return
+    const ok = window.confirm(`Delete project "${active.name}"? This detaches linked emails and removes documents/BRDs.`)
+    if (!ok) return
+    try {
+      const r = await deleteProject(active.id)
+      if (r.error) { toast(r.error, 'warn'); return }
+      toast('Project deleted', 'ok')
+      setActive(null); setContext({ emails: [], documents: [] }); setBrdContent(null); setActiveBrdId(null)
+      load()
+    } catch { toast('Delete failed', 'warn') }
+  }
+
   const handleUploadDoc = async (e) => {
     const file = e.target.files[0]; if (!file || !active) return
     try { await uploadProjectDoc(active.id, file); toast('Document processed.', 'ok'); selectProject(active) }
@@ -132,6 +145,14 @@ export default function Projects() {
           >
             <FolderPlus size={14} /> New Project
           </button>
+          {active && (
+            <button
+              onClick={handleDeleteProject}
+              className="border border-red-500 text-red-400 bg-red-500/10 hover:bg-red-500 hover:text-black transition-colors px-5 py-3 rounded-sm font-space text-[10px] uppercase tracking-widest flex items-center gap-2 w-fit"
+            >
+              Delete Project
+            </button>
+          )}
         </div>
       </div>
 

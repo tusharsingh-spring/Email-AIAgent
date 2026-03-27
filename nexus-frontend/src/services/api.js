@@ -60,10 +60,10 @@ export const getProject = (id) => req(`/api/projects/${id}`)
 export const getProjectContext = (id) => req(`/api/projects/${id}/context`)
 export const getProjectEmails = (id) => req(`/api/projects/${id}/emails`)
 export const getProjectDocuments = (id) => req(`/api/projects/${id}/documents`)
+export const deleteProject = (id) => req(`/api/projects/${id}`, { method: 'DELETE' })
 
 export const getProjectBRD = (id) => req(`/api/projects/${id}/brd`)
-export const getProjectBRDStatus = (id) => req(/api/projects/${id}/brd/status)
-// export const getProjectBRDStatus = (id) => req(`/api/projects/${id}/brd/status`)
+export const getProjectBRDStatus = (id) => req(`/api/projects/${id}/brd/status`)
 export const generateProjectBRD = (id) => req(`/api/projects/${id}/generate-brd`, { method: 'POST' })
 export const runProjectAgent = (id) => req(`/api/projects/${id}/agent`, { method: 'POST' })
 export const assignEmail = (id, email_id) => 
@@ -101,6 +101,7 @@ export const listBrds = () => req('/api/brd/list')
 // Calendar
 export const getCalendarEvents = (days = 14) => req(`/api/calendar/events?days=${days}`)
 export const cancelEvent = (id) => req(`/api/calendar/events/${id}`, { method: 'DELETE' })
+export const deleteCalendarEvent = cancelEvent
 
 // Ingest
 export const fetchMultiChannel = () => req('/api/multi-channel/fetch')

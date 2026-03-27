@@ -672,7 +672,7 @@ code{
     <div style="font-size:10px;color:var(--tx2);display:flex;align-items:center;gap:4px" id="poll-ind">
       <div class="dot dot-g pulse"></div>polling every 30s
     </div>
-    <a class="btn btn-g btn-sm" href="http://localhost:8000/auth/login" target="_blank" id="auth-btn">🔑 Connect Google</a>
+    <a class="btn btn-g btn-sm" href="" target="_blank" id="auth-btn">🔑 Connect Google</a>
     <button class="btn btn-a btn-sm" onclick="refreshAll()">↻</button>
   </div>
 </header>
@@ -686,7 +686,7 @@ code{
     <div style="font-size:12px;font-weight:500;color:var(--amb)">Google account not connected</div>
     <div style="font-size:10px;color:var(--tx2);margin-top:2px">Connect to read real Gmail and write to Google Calendar.</div>
   </div>
-  <a class="btn btn-a btn-sm" href="http://localhost:8000/auth/login" target="_blank">Connect →</a>
+  <a class="btn btn-a btn-sm" href="" target="_blank" id="auth-banner-link">Connect →</a>
 </div>
 
 <!-- ══ DASHBOARD ══ -->
@@ -1087,7 +1087,9 @@ code{
 <div class="toasts" id="toasts"></div>
 
 <script>
-const API = 'http://localhost:8000';
+const API = window.location.origin;
+const WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
+const AUTH_URL = `${API}/auth/login`;
 let ws = null, state = {actions:[], events:[], emails:[], brds:{}, authenticated:false, brdRunning:{}};
 let charts = {};
 let clusterHints = {};
@@ -1095,7 +1097,7 @@ let actFilter = 'all';
 
 /* ── WebSocket ── */
 function connectWS() {
-  ws = new WebSocket(`ws://localhost:8000/ws/live`);
+  ws = new WebSocket(`${WS_BASE}/ws/live`);
   ws.onopen = () => {
     setDot('g','Connected · LangGraph active');
     log('ok','NEXUS WebSocket connected');
@@ -1534,6 +1536,7 @@ function updateAuth(ok) {
     s.style.color = ok ? 'var(--grn)' : 'var(--red)';
   }
   const btn = document.getElementById('auth-btn');
+  const ban = document.getElementById('auth-banner-link');
   if(btn) {
     if(ok) {
         btn.textContent = '✓ Connected';
@@ -1546,9 +1549,13 @@ function updateAuth(ok) {
         btn.textContent = '🔑 Connect Google';
         btn.classList.add('btn-g');
         btn.classList.remove('btn-grn');
-        btn.href = 'http://localhost:8000/auth/login';
+        btn.href = AUTH_URL;
         btn.style.pointerEvents = 'auto';
     }
+  }
+  if(ban){
+    ban.href = ok ? '#' : AUTH_URL;
+    ban.style.pointerEvents = ok ? 'none' : 'auto';
   }
 }
 
@@ -2172,10 +2179,14 @@ function renderCalendar() {
 function updateBadges() {
   const p=state.actions.filter(a=>a.status==='pending').length;
   const e=state.actions.filter(a=>a.status==='escalated').length;
-  document.getElementById('nb-inbox').textContent  = state.emails.length||0;
-  document.getElementById('nb-actions').textContent= p+e;
-  document.getElementById('nb-esc').textContent     = e;
-  document.getElementById('nb-brd').textContent     = Object.keys(state.brds).length;
+  const nbInbox   = document.getElementById('nb-inbox');
+  const nbActions = document.getElementById('nb-actions');
+  const nbEsc     = document.getElementById('nb-esc');
+  const nbBrd     = document.getElementById('nb-brd');
+  if(nbInbox)   nbInbox.textContent   = state.emails.length||0;
+  if(nbActions) nbActions.textContent = p+e;
+  if(nbEsc)     nbEsc.textContent     = e;
+  if(nbBrd)     nbBrd.textContent     = Object.keys(state.brds).length;
 }
 
 function setDot(c,lbl) {
@@ -2227,6 +2238,10 @@ const DEMO_BRD_PREVIEW = {title:'BRD: AI Customer Support Chatbot', fr:12, nfr:7
 
 /* ── Init ── */
 document.addEventListener('DOMContentLoaded', ()=>{
+  const authBtn = document.getElementById('auth-btn');
+  if(authBtn) authBtn.href = AUTH_URL;
+  const authBannerLink = document.getElementById('auth-banner-link');
+  if(authBannerLink) authBannerLink.href = AUTH_URL;
   connectWS(); checkAuth(); loadStats();
   loadInbox(); loadActions(); loadBRDs(); loadProjects();
   log('info','NEXUS initialized — LangGraph + Gmail API + Calendar API');
