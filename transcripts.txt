@@ -1,0 +1,218 @@
+Meeting & Chat Transcript Scan (Project: "Nexus Core" – User Identity & Access Management)
+🗓️ 2026-03-24 | Email Thread: Subject: URGENT – Identity Service Redesign Kickoff
+From: Priya Mehta (PM)
+To: dev-team@nexus.com, ux-team@nexus.com
+Timestamp: 10:15 AM
+
+Team,
+We need to kick off the Identity Service redesign. The current auth flow has a 38% drop-off at the 2FA step. We must have a plan by end of week.
+Please review the attached analytics and prepare initial requirements.
+
+Must haves:
+
+Support for SMS and TOTP 2FA
+
+Fallback to email if SMS fails
+
+Compliance with GDPR & CCPA
+
+Let’s align in the standup today at 3 PM.
+– Priya
+
+🗓️ 2026-03-24 | Google Chat: #identity-project
+Participants: Priya (PM), Ankit (Backend Lead), Riya (UX), Vikram (Security), Sasha (Frontend)
+
+3:05 PM – Priya:
+
+Quick intro: we need to reduce drop‑off. Ankit, how feasible is parallel 2FA methods?
+
+3:07 PM – Ankit:
+
+Totally feasible. We can send SMS and email simultaneously, but we need to avoid spamming. I’d propose: primary method (SMS) with a “Resend” button, and a “Try email instead” link. That’s low effort.
+
+3:10 PM – Riya:
+
+From UX perspective, we should show both options but default to the most reliable for the user’s region. We can use a dropdown after first failure. I’ll wireframe.
+
+3:12 PM – Vikram:
+
+Security note: If we offer email fallback, we need to ensure the email address is already verified. Also, rate‑limit attempts: 5 tries in 10 minutes.
+
+3:15 PM – Priya:
+
+Good. Let’s add a requirement: “Limit failed 2FA attempts to 5 per 10 minutes.”
+Also, do we support TOTP (Google Authenticator)?
+
+3:18 PM – Ankit:
+
+Yes, we already have the library. We can add it as an additional option, but it requires users to set it up. Could be part of a “security settings” page later. For MVP, let’s keep it to SMS/email fallback.
+
+3:22 PM – Sasha:
+
+Frontend: We’ll need to store the user’s preferred method. Can we store that in the user profile?
+
+3:24 PM – Ankit:
+
+Yes, we’ll extend the user table. We’ll also add a flag for “2FA enabled” and preferred method.
+
+3:27 PM – Priya:
+
+Great. Let’s capture these as requirements. I’ll start a BRD draft.
+
+🗓️ 2026-03-25 | Email Thread: Subject: RE: Identity Service – BRD Scope Clarification
+From: Vikram (Security)
+To: Priya (PM), Ankit (Backend)
+Timestamp: 9:45 AM
+
+Priya,
+I’ve reviewed the draft BRD. We need to explicitly call out:
+
+The 2FA fallback must never bypass rate‑limiting.
+
+Log all 2FA events for audit.
+
+If a user attempts 2FA from a new device, send a notification email.
+
+Please add these.
+– Vikram
+
+🗓️ 2026-03-25 | Google Chat: #identity-project
+2:15 PM – Riya:
+
+Here’s the wireframe: [link]. We have:
+
+After login, show a screen “We’ve sent a code to +1******”.
+
+“Didn’t get it?” – expands options: Resend SMS, Try email, Use authenticator app.
+
+What about the “Remember this device” checkbox? Should we include?
+
+2:20 PM – Ankit:
+
+Yes, that’s a must for UX. We’ll store a device fingerprint cookie (with expiration). Security: Vikram, okay?
+
+2:22 PM – Vikram:
+
+Fine, as long as the cookie is signed and we have a clear “Trust this device” option with a maximum trust period (say 30 days). Then user can revoke trusted devices from account settings.
+
+2:25 PM – Priya:
+
+Let’s add that: “Remember this device” with 30‑day trust. User can revoke from profile.
+
+2:28 PM – Sasha:
+
+I’ll need the API endpoints for enabling/disabling 2FA. Also, we need to support re‑enrollment if user loses their phone.
+
+2:30 PM – Ankit:
+
+Good point – we need an account recovery flow. For MVP, we can allow fallback to backup codes (one‑time use). Generate 10 backup codes during 2FA setup.
+
+2:33 PM – Priya:
+
+Let’s add that: Backup codes as part of setup. This addresses the “lost phone” scenario.
+
+🗓️ 2026-03-26 | Email Thread: Subject: Identity Service – Legal & Compliance Review
+From: Legal Team
+To: Priya (PM)
+Timestamp: 11:20 AM
+
+Priya,
+Regarding the 2FA and device tracking:
+
+Ensure we have explicit consent for SMS and email communications (already in terms).
+
+Device trust must be explained clearly in privacy policy.
+
+Backup codes must be stored encrypted, and users should be warned to keep them safe.
+
+Please update the BRD to reflect these privacy considerations.
+– Legal
+
+🗓️ 2026-03-26 | Google Chat: #identity-project
+4:00 PM – Priya:
+
+Quick sync on timeline. We have requirements:
+
+Primary SMS + fallback email
+
+Rate‑limiting (5 attempts/10 min)
+
+Device trust (30 days)
+
+Backup codes (10 per user)
+
+Audit logging
+
+New device notification
+
+Anything else before I finalize BRD?
+
+4:05 PM – Riya:
+
+What about accessibility? For users who can’t receive SMS (e.g., some international carriers), we should allow email as primary if SMS fails.
+
+4:07 PM – Ankit:
+
+We can detect carrier failure and automatically suggest email. We’ll need to handle that in the fallback logic.
+
+4:10 PM – Vikram:
+
+Also, we must not allow fallback to email if the email is the same as the account’s primary email and it’s not verified. That’s a security hole.
+
+4:12 PM – Priya:
+
+Good catch – requirement: “Email fallback only available for verified email addresses.”
+
+Alright, I’ll compile these into the BRD. Thanks everyone.
+
+🗓️ 2026-03-27 | Email Thread: Subject: Final BRD – Identity Service Redesign
+From: Priya Mehta (PM)
+To: Stakeholders (Tech, Product, Security, Legal)
+Timestamp: 9:00 AM
+
+All,
+Please find the final BRD attached. Summary of requirements:
+
+FR‑01: 2FA using SMS as primary, with email fallback after configurable retries.
+
+FR‑02: Rate‑limiting: 5 attempts per 10 minutes, with lockout and notification.
+
+FR‑03: Device trust: users can opt to trust a device for 30 days; trusted device bypasses 2FA.
+
+FR‑04: Backup codes: 10 one‑time codes generated at 2FA setup, stored encrypted.
+
+FR‑05: Audit trail: log all 2FA events (attempts, successes, failures, trust actions).
+
+FR‑06: New device login notification via email.
+
+FR‑07: Accessibility: fallback to email if SMS carrier failure is detected.
+
+NFR‑01: 99.9% uptime for 2FA verification service.
+
+NFR‑02: Sub‑second latency for code verification.
+
+Please provide sign‑off by EOD tomorrow.
+– Priya
+
+🗓️ 2026-03-27 | Google Chat: #identity-project
+10:15 AM – Ankit:
+
+BRD looks good. One more thing: should we support TOTP (authenticator apps) as an alternative? It’s mentioned as a future enhancement in the BRD, but maybe we can add it to MVP if resources allow.
+
+10:20 AM – Priya:
+
+Let’s scope it as v2. MVP already has enough complexity. We’ll keep it in the backlog.
+
+10:22 AM – Riya:
+
+Agreed. The design is already modular, so adding TOTP later won’t be a big change.
+
+10:25 AM – Vikram:
+
+I’ll sign off on the BRD as long as the security requirements are met.
+
+Also, we need to add a requirement for recovery: if a user loses all 2FA methods (phone, email, backup codes), we must have an admin‑assisted recovery process. That’s a compliance need.
+
+10:28 AM – Priya:
+
+Good point – I’ll add that as FR‑08 before sending the final signed version.

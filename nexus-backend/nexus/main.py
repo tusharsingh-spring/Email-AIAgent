@@ -549,7 +549,15 @@ async def list_emails(limit: int = MAX_EMAIL_FETCH):
     try:
         emails = await run_blocking(fetch_unread_emails, creds, limit)
         store["latest_emails"] = emails
-        return {"emails": emails}
+        # Attach AI project suggestions for UI mapping
+        enriched = []
+        for em in emails:
+            try:
+                em["project_suggestion"] = suggest_project_for_email(em)
+            except Exception:
+                em["project_suggestion"] = None
+            enriched.append(em)
+        return {"emails": enriched}
     except Exception as e:
         await broadcast({"type":"log","level":"error","msg":f"Inbox fetch failed: {e}"})
         return {"emails": [], "error": f"Inbox fetch failed: {e}"}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { getEmails, processEmail, clusterManual } from '../services/api'
+import { getEmails, processEmail, clusterManual, getProjects, attachEmailToProject } from '../services/api'
 
 const FT = iso => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return iso || '' } }
 
@@ -9,6 +9,14 @@ export default function Inbox() {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
+  const [projects, setProjects] = useState([])
+  const [selections, setSelections] = useState({})
+  const [assigning, setAssigning] = useState({})
+
+  useEffect(() => {
+    load()
+    loadProjects()
+  }, [])
 
   const load = async () => {
     setLoading(true)
@@ -20,6 +28,15 @@ export default function Inbox() {
       addLog('ok', `${(d.emails || []).length} emails fetched`)
     } catch { toast('Backend not running', 'warn') }
     setLoading(false)
+  }
+
+  const loadProjects = async () => {
+    try {
+      const d = await getProjects()
+      setProjects(d.projects || [])
+    } catch {
+      /* ignore */
+    }
   }
 
   const toggleSelect = (id) => {
@@ -45,6 +62,29 @@ export default function Inbox() {
   const handleProcess = async (id) => {
     try { await processEmail(id); toast('Processing...', 'ok'); addLog('info', `Manual trigger: ${id}`) }
     catch { toast('Failed', 'warn') }
+  }
+
+  const handleAssign = async (emailId, projectId) => {
+    if (!projectId) { toast('Select a project first', 'warn'); return }
+    setAssigning(prev => ({ ...prev, [emailId]: true }))
+    try {
+      const res = await attachEmailToProject(projectId, emailId)
+      if (res.error) throw new Error(res.error)
+      toast('Email linked to project', 'ok')
+      addLog('ok', `Email ${emailId} → project ${projectId}`)
+      dispatch({
+        type: 'SET_EMAILS',
+        emails: state.emails.map(e => e.id === emailId ? { ...e, project_id: projectId } : e)
+      })
+    } catch (e) {
+      toast(e.message || 'Attach failed', 'warn')
+    } finally {
+      setAssigning(prev => {
+        const next = { ...prev }
+        delete next[emailId]
+        return next
+      })
+    }
   }
 
   const emails = state.emails
@@ -78,6 +118,42 @@ export default function Inbox() {
                   <div className="ei-sub">{e.subject}</div>
                   <div className="ei-from">{e.sender}</div>
                   <div className="ei-pre">{e.snippet || ''}</div>
+                  {e.project_id ? (
+                    <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--grn)' }}>✓ Linked to project</span>
+                      {e.project_suggestion && (
+                        <span style={{ fontSize: '10px', color: 'var(--tx3)' }}>
+                          🤖 Suggested: <strong style={{ color: 'var(--a2)' }}>{e.project_suggestion.project_name}</strong>
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }} onClick={ev => ev.stopPropagation()}>
+                      <select
+                        value={selections[e.id] ?? e.project_suggestion?.project_id ?? ''}
+                        onChange={(ev) => setSelections(prev => ({ ...prev, [e.id]: ev.target.value }))}
+                        disabled={assigning[e.id]}
+                        style={{ background: 'var(--bg3)', border: '1px solid var(--bdr2)', borderRadius: 'var(--rs)', padding: '6px 8px', color: 'var(--tx)', fontSize: '11px', minWidth: '180px' }}
+                      >
+                        <option value="">— Select project —</option>
+                        {projects.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      {e.project_suggestion && (
+                        <span style={{ fontSize: '10px', color: 'var(--tx3)' }}>
+                          🤖 Suggests: <strong style={{ color: 'var(--a2)' }}>{e.project_suggestion.project_name}</strong>
+                        </span>
+                      )}
+                      <button
+                        className="btn btn-a btn-sm"
+                        onClick={() => handleAssign(e.id, selections[e.id] ?? e.project_suggestion?.project_id ?? '')}
+                        disabled={assigning[e.id]}
+                      >
+                        {assigning[e.id] ? 'Linking…' : 'Assign →'}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="ei-t">{FT(e.received_at || e.date)}</div>
               </div>
