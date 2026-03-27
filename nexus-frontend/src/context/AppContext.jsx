@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useReducer, useCallback, useRef, useState, useEffect } from 'react'
 
 const AppContext = createContext(null)
 
@@ -61,6 +61,22 @@ export function AppProvider({ children }) {
   const toastListeners = useRef([])
   const logListeners = useRef([])
 
+  // Theme Management
+  const [theme, setTheme] = useState(() => localStorage.getItem('nexus-theme') || 'dark')
+
+  useEffect(() => {
+    localStorage.setItem('nexus-theme', theme)
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+  }, [])
+
   const toast = useCallback((msg, type = 'ok') => {
     toastListeners.current.forEach(fn => fn(msg, type))
   }, [])
@@ -80,7 +96,7 @@ export function AppProvider({ children }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ state, dispatch, toast, addLog, onToast, onLog }}>
+    <AppContext.Provider value={{ state, dispatch, toast, addLog, onToast, onLog, theme, toggleTheme }}>
       {children}
     </AppContext.Provider>
   )

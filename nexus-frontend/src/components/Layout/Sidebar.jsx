@@ -1,100 +1,72 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
+import { LayoutDashboard, FolderKanban, Settings2, Sun, Moon } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import { useEffect, useState } from 'react'
-import { getStats, getProjects } from '../../services/api'
 
-const NAV = [
-  { group: 'Overview' },
-  { path: '/', label: 'Dashboard', ico: '⬡' },
-  { group: 'Email Agent' },
-  { path: '/inbox', label: 'Unassigned Inbox', ico: '✉', badge: 'inbox' },
-  { path: '/actions', label: 'Actions', ico: '⚡', badge: 'actions', badgeCls: 'nb-a' },
-  { path: '/escalations', label: 'Escalations', ico: '▲', badge: 'esc', badgeCls: 'nb-r' },
-  { group: 'Project Management' },
-  { path: '/projects', label: 'Projects', ico: '🗂', badge: 'projects', badgeCls: 'nb-g' },
-  { path: '/upload', label: 'Upload Resources', ico: '⬆' },
-  { group: 'Intelligence' },
-  { path: '/metrics', label: 'Live Metrics', ico: '▣' },
-  { group: 'Calendar' },
-  { path: '/calendar', label: 'Events', ico: '▦' },
-  { group: 'System' },
-  { path: '/settings', label: 'Settings', ico: '◌' },
-  { path: '/setup', label: 'Setup & Auth', ico: '◉' },
-]
-
-export default function Sidebar({ wsStatus }) {
-  const { state } = useApp()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [badges, setBadges] = useState({ inbox: 0, actions: 0, esc: 0, projects: 0 })
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [s, p] = await Promise.all([getStats(), getProjects()])
-        setBadges({
-          inbox: s.unassigned_emails || 0,
-          actions: (s.pending || 0) + (s.pending_clusters || 0),
-          esc: s.escalations || 0,
-          projects: (p.projects || []).length,
-        })
-      } catch {}
-    }
-    load()
-    const t = setInterval(load, 5000)
-    return () => clearInterval(t)
-  }, [])
-
-  const dotCls = wsStatus === 'connected' ? 'dot dot-g pulse' : wsStatus === 'error' ? 'dot dot-r' : 'dot dot-a pulse'
-  const wsLabel = wsStatus === 'connected' ? 'Connected · LangGraph active' : wsStatus === 'error' ? 'Error — check backend' : 'Connecting...'
+export default function Sidebar() {
+  const { theme, toggleTheme } = useApp()
+  const navItems = [
+    { name: 'Command Center', path: '/', icon: LayoutDashboard },
+    { name: 'Project Studio', path: '/projects', icon: FolderKanban },
+    { name: 'Agent Directives', path: '/settings', icon: Settings2 },
+  ]
 
   return (
-    <aside className="rail">
-      <div className="brand">
-        <div className="brand-inner">
-          <div className="brand-mark">NX</div>
-          <div>
-            <div className="brand-name">NEXUS</div>
-            <div className="brand-sub">langgraph · gmail · calendar</div>
-          </div>
+    <div className="fixed top-0 left-0 w-[260px] h-screen border-r border-brand-border bg-brand-black/95 backdrop-blur-xl z-[5000] flex flex-col hidden lg:flex">
+      
+      {/* Brand Section */}
+      <div className="p-8 border-b border-brand-border mb-4">
+        <div className="font-bebas text-5xl tracking-widest text-brand-text leading-none">
+          NEXUS<span className="text-brand-blue">.</span>
+        </div>
+        <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted mt-2">
+          AI Agent Platform
         </div>
       </div>
 
-      {NAV.map((item, i) => {
-        if (item.group) {
-          return <div key={i} className="nav-grp">{item.group}</div>
-        }
-        const isActive = location.pathname === item.path ||
-          (item.path !== '/' && location.pathname.startsWith(item.path))
-        return (
-          <div
+      {/* Navigation */}
+      <div className="flex-1 px-4 flex flex-col gap-2">
+        {navItems.map((item) => (
+          <NavLink
             key={item.path}
-            className={`nav-i${isActive ? ' on' : ''}`}
-            onClick={() => navigate(item.path)}
+            to={item.path}
+            className={({ isActive }) =>
+              `flex items-center gap-4 px-4 py-3 rounded-sm transition-all duration-300 font-space text-[11px] uppercase tracking-widest relative group overflow-hidden
+              ${isActive ? 'bg-brand-input text-brand-text font-bold' : 'text-brand-muted hover:text-brand-text hover:bg-brand-hover'}`
+            }
           >
-            <span className="ico">{item.ico}</span>
-            {item.label}
-            {item.badge && (
-              <span className={`nav-nb ${item.badgeCls || 'nb-a'}`}>
-                {badges[item.badge] || 0}
-              </span>
+            {({ isActive }) => (
+              <>
+                {/* Neon Indicator */}
+                {isActive && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-blue shadow-[0_0_12px_rgba(0,181,226,1)]"></div>
+                )}
+                
+                <item.icon className="w-4 h-4 shrink-0 transition-colors" style={{ color: isActive ? 'var(--color-brand-blue)' : 'inherit' }} />
+                <span>{item.name}</span>
+              </>
             )}
-          </div>
-        )
-      })}
-
-      <div className="rail-foot">
-        <div className="status-row">
-          <div className={dotCls} />
-          <span>{wsLabel}</span>
-        </div>
-        <div style={{ fontSize: '9px', color: 'var(--tx3)', marginTop: '3px', fontFamily: "'DM Mono',monospace" }}>
-          {state.ownerEmail || 'Not authenticated'}
-        </div>
-        <div style={{ fontSize: '9px', color: 'var(--tx3)', marginTop: '2px', fontFamily: "'DM Mono',monospace" }}>
-          LangGraph + Groq Llama 3.1
-        </div>
+          </NavLink>
+        ))}
       </div>
-    </aside>
+
+      {/* Footer / System Status */}
+      <div className="p-6 border-t border-brand-border flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-[#00ff9d] shadow-[0_0_8px_rgba(0,255,157,0.8)]"></div>
+          <div>
+            <div className="font-space text-[10px] uppercase text-[#00ff9d]">Systems Online</div>
+            <div className="font-space text-[9px] uppercase text-brand-muted opacity-60 mt-1">WS Connected</div>
+          </div>
+        </div>
+
+        <button 
+          onClick={toggleTheme} 
+          className="p-2 text-brand-muted hover:text-brand-text transition-colors rounded-sm hover:bg-brand-hover cursor-pointer"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+      </div>
+
+    </div>
   )
 }

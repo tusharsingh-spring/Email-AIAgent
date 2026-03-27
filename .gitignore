@@ -43,6 +43,8 @@ yarn-error.log*
 pnpm-debug.log*
 .nyc_output/
 
+/SKILLS
+
 # ── Extension / Build Artifacts ──
 chrome-recording-transcription-extension/dist/
 chrome-recording-transcription-extension/build/

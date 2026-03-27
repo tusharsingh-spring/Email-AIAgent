@@ -1,0 +1,729 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HYPERFUEL Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#00B5E2;
+  --yellow:#FFE234;
+  --black:#080808;
+  --white:#ffffff;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white);overflow-x:hidden;cursor:none}
+
+/* CURSOR */
+.cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference}
+.cursor-ring{position:fixed;width:36px;height:36px;border:1px solid rgba(0,181,226,0.4);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:transform 0.18s ease}
+
+/* LOADER */
+.loader{position:fixed;inset:0;background:var(--black);z-index:8000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;transition:opacity 0.6s ease,visibility 0.6s ease}
+.loader.done{opacity:0;visibility:hidden;pointer-events:none}
+.loader-word{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,10vw,120px);letter-spacing:0.05em;overflow:hidden;line-height:1}
+.loader-word span{display:inline-block;transform:translateY(100%);transition:transform 0.7s cubic-bezier(0.16,1,0.3,1)}
+.loader-word span.up{transform:translateY(0)}
+.loader-bar-wrap{width:160px;height:1px;background:rgba(255,255,255,0.1)}
+.loader-bar{height:100%;background:var(--blue);width:0;transition:width 0.8s ease}
+
+/* MARQUEE */
+.marquee-wrap{overflow:hidden;background:var(--blue);padding:10px 0}
+.marquee-track{display:flex;animation:marquee 20s linear infinite;white-space:nowrap}
+.marquee-track span{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:0.15em;color:var(--black);padding:0 24px;opacity:0.7}
+.marquee-track span.dot{opacity:1;padding:0 6px}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* HERO */
+.hero{min-height:100svh;background:var(--black);display:flex;flex-direction:column;justify-content:space-between;padding:clamp(20px,4vw,40px) clamp(20px,5vw,48px) clamp(32px,4vw,48px);position:relative;overflow:hidden}
+.hero-bg{position:absolute;bottom:-40px;left:-8px;font-family:'Bebas Neue',sans-serif;font-size:clamp(100px,22vw,300px);color:rgba(255,255,255,0.02);white-space:nowrap;pointer-events:none;line-height:1;user-select:none}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;position:relative;z-index:2;opacity:0;transform:translateY(-12px);transition:opacity 0.6s ease 0.1s,transform 0.6s ease 0.1s}
+.hero-top.on{opacity:1;transform:translateY(0)}
+.htag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.4}
+.hfor .lbl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.35;margin-bottom:3px}
+.hfor .nm{font-size:13px;font-weight:600;opacity:0.8;text-align:right}
+.hero-center{flex:1;display:flex;flex-direction:column;justify-content:center;padding:clamp(48px,8vw,96px) 0 clamp(24px,4vw,40px);position:relative;z-index:2}
+.hero-eye{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;opacity:0;margin-bottom:16px;transition:opacity 0.5s ease 0.5s}
+.hero-eye.on{opacity:0.4}
+.hero-h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(72px,16vw,200px);line-height:0.88;letter-spacing:-0.01em}
+.hero-h1 .line{overflow:hidden;display:block}
+.hero-h1 .line span{display:block;transform:translateY(110%);transition:transform 0.9s cubic-bezier(0.16,1,0.3,1)}
+.hero-h1 .line span.up{transform:translateY(0)}
+.hero-h1 .line:nth-child(2) span{transition-delay:0.12s}
+.blue{color:var(--blue)}
+.hero-sub{margin-top:24px;font-size:clamp(14px,1.8vw,17px);opacity:0;color:rgba(255,255,255,0.55);max-width:520px;line-height:1.65;transition:opacity 0.6s ease 0.9s}
+.hero-sub.on{opacity:1}
+.hero-bottom{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;position:relative;z-index:2;opacity:0;transition:opacity 0.6s ease 1.1s}
+.hero-bottom.on{opacity:1}
+.hby .lbl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.35;margin-bottom:3px}
+.hby .nm{font-family:'Bebas Neue',sans-serif;font-size:clamp(22px,4vw,36px);letter-spacing:0.02em}
+.hby .role{font-size:11px;opacity:0.4;margin-top:1px}
+.scroll-cue{display:flex;flex-direction:column;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.15em;text-transform:uppercase;opacity:0.3}
+.scroll-line{width:1px;height:40px;background:rgba(255,255,255,0.3);position:relative;overflow:hidden}
+.scroll-line::after{content:'';position:absolute;top:-100%;left:0;right:0;bottom:0;background:var(--blue);animation:scrollDown 2s ease infinite}
+@keyframes scrollDown{0%{top:-100%}100%{top:100%}}
+
+/* SECTIONS */
+section{padding:clamp(72px,10vw,120px) clamp(20px,5vw,48px)}
+.inner{max-width:960px;margin:0 auto}
+.snum{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;opacity:0.3;margin-bottom:10px}
+.stitle{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,9vw,100px);line-height:0.9;letter-spacing:0.01em;margin-bottom:clamp(28px,4vw,48px)}
+
+/* REVEAL */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity 0.65s ease,transform 0.65s ease}
+.reveal.on{opacity:1;transform:translateY(0)}
+.d1{transition-delay:0.05s}.d2{transition-delay:0.12s}.d3{transition-delay:0.19s}.d4{transition-delay:0.26s}.d5{transition-delay:0.33s}.d6{transition-delay:0.4s}
+
+/* WELCOME */
+.s-welcome{background:var(--yellow);color:var(--black)}
+.welcome-body{font-size:clamp(15px,2vw,19px);line-height:1.78;opacity:0.72;max-width:680px}
+.welcome-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:32px}
+.tag{background:var(--black);color:var(--yellow);font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:8px 16px;border-radius:2px}
+
+/* CHECKLIST SECTIONS */
+.s-checklist{background:var(--black)}
+.s-checklist-alt{background:#0d0d0d}
+.s-checklist-blue{background:var(--blue);color:var(--black)}
+.s-checklist-yellow{background:var(--yellow);color:var(--black)}
+
+.check-grid{display:flex;flex-direction:column;gap:0}
+.check-item{display:flex;align-items:flex-start;gap:20px;padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:background 0.2s ease;border-radius:2px;user-select:none}
+.s-checklist-blue .check-item{border-bottom-color:rgba(0,0,0,0.1)}
+.s-checklist-yellow .check-item{border-bottom-color:rgba(0,0,0,0.1)}
+.check-item:last-child{border-bottom:none}
+.check-item:hover{background:rgba(255,255,255,0.02)}
+.s-checklist-blue .check-item:hover{background:rgba(0,0,0,0.05)}
+.s-checklist-yellow .check-item:hover{background:rgba(0,0,0,0.05)}
+
+.checkbox{width:22px;height:22px;border:2px solid rgba(255,255,255,0.2);border-radius:3px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all 0.25s ease;position:relative}
+.s-checklist-blue .checkbox{border-color:rgba(0,0,0,0.25)}
+.s-checklist-yellow .checkbox{border-color:rgba(0,0,0,0.25)}
+.checkbox.checked{background:var(--blue);border-color:var(--blue)}
+.s-checklist-blue .checkbox.checked{background:var(--black);border-color:var(--black)}
+.s-checklist-yellow .checkbox.checked{background:var(--black);border-color:var(--black)}
+.checkbox::after{content:'✓';font-size:13px;color:var(--black);opacity:0;transition:opacity 0.2s ease;font-weight:700}
+.s-checklist-blue .checkbox::after{color:var(--blue)}
+.s-checklist-yellow .checkbox::after{color:var(--yellow)}
+.checkbox.checked::after{opacity:1}
+
+.check-content{}
+.check-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(20px,2.5vw,26px);letter-spacing:0.02em;line-height:1;margin-bottom:5px}
+.check-desc{font-size:13px;opacity:0.5;line-height:1.6}
+.s-checklist-blue .check-desc{opacity:0.6}
+.s-checklist-yellow .check-desc{opacity:0.6}
+
+.check-badge{display:inline-block;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:2px;margin-left:10px;vertical-align:middle}
+.badge-req{background:rgba(255,0,80,0.15);color:#ff5080}
+.badge-opt{background:rgba(0,181,226,0.1);color:var(--blue)}
+.s-checklist-blue .badge-req{background:rgba(0,0,0,0.15);color:rgba(0,0,0,0.7)}
+.s-checklist-yellow .badge-req{background:rgba(0,0,0,0.1);color:rgba(0,0,0,0.6)}
+
+/* PROCESS */
+.s-process{background:#090909}
+.process-wrap{border:1px solid #1a1a1a;border-radius:4px;overflow:hidden}
+.process-row{display:grid;grid-template-columns:72px 1fr;border-bottom:1px solid #1a1a1a;transition:background 0.3s ease}
+.process-row:last-child{border-bottom:none}
+.process-row:hover{background:#0f0f0f}
+.process-n{display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--blue);opacity:0.3;border-right:1px solid #1a1a1a;padding:28px 0;transition:opacity 0.3s ease}
+.process-row:hover .process-n{opacity:0.9}
+.process-content{padding:24px}
+.process-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(20px,2.5vw,28px);letter-spacing:0.02em;margin-bottom:6px;line-height:1}
+.process-desc{font-size:13px;color:rgba(255,255,255,0.42);line-height:1.65}
+.process-time{display:inline-block;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--blue);margin-top:8px;padding:3px 8px;border:1px solid rgba(0,181,226,0.2);border-radius:2px}
+
+/* COMMUNICATION */
+.comm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2px}
+.comm-card{background:#111;padding:28px 24px}
+.comm-icon{font-size:24px;margin-bottom:14px;display:block;opacity:0.6}
+.comm-name{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:0.02em;margin-bottom:8px;line-height:1}
+.comm-desc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.65}
+
+/* TIMELINE */
+.s-timeline{background:var(--yellow);color:var(--black)}
+.tl{display:flex;flex-direction:column}
+.tl-item{display:grid;grid-template-columns:64px 1fr;padding:clamp(20px,3vw,28px) 0;border-bottom:1px solid rgba(0,0,0,0.1);align-items:start}
+.tl-item:last-child{border-bottom:none}
+.tl-n{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:1;opacity:0.12}
+.tl-t{font-family:'Bebas Neue',sans-serif;font-size:clamp(22px,3vw,30px);letter-spacing:0.02em;margin-bottom:6px;line-height:1}
+.tl-d{font-size:13px;opacity:0.58;line-height:1.65}
+.tl-date{display:inline-block;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;background:var(--black);color:var(--yellow);padding:4px 10px;border-radius:2px;margin-top:8px}
+
+/* FEEDBACK */
+.s-feedback{background:var(--black)}
+.feedback-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2px}
+.fb-step{background:#0e0e0e;padding:28px 24px;position:relative}
+.fb-step::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--blue)}
+.fb-num{font-family:'Bebas Neue',sans-serif;font-size:56px;color:var(--blue);opacity:0.15;line-height:1;margin-bottom:8px}
+.fb-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:0.02em;margin-bottom:6px;line-height:1}
+.fb-desc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.65}
+
+/* DELIVERY */
+.s-delivery{background:#0a0a0a}
+.del-info{background:#111;border:1px solid #1e1e1e;border-radius:4px;overflow:hidden}
+.del-info-head{background:var(--blue);padding:20px 24px}
+.del-info-head-title{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--black);letter-spacing:0.02em}
+.del-info-body{padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:540px){.del-info-body{grid-template-columns:1fr}}
+.del-folder{}
+.del-folder-name{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--blue);margin-bottom:8px}
+.del-folder-items{display:flex;flex-direction:column;gap:6px}
+.del-folder-item{font-size:13px;color:rgba(255,255,255,0.5);padding-left:16px;position:relative;line-height:1.5}
+.del-folder-item::before{content:'/';position:absolute;left:0;font-family:'Space Mono',monospace;color:var(--blue)}
+
+/* FOOTER */
+footer{background:var(--black);padding:clamp(64px,10vw,120px) clamp(20px,5vw,48px) clamp(48px,6vw,72px);border-top:1px solid #111;text-align:center}
+.ft-bg{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,14vw,180px);letter-spacing:0.04em;color:var(--white);opacity:0.04;margin-bottom:clamp(20px,3vw,32px);line-height:1;user-select:none}
+.ft-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,5vw,48px);letter-spacing:0.08em;margin-bottom:8px}
+.ft-role{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.25);margin-bottom:24px}
+.ft-tag{display:inline-block;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--blue);padding:8px 16px;border:1px solid rgba(0,181,226,0.25);border-radius:2px}
+
+/* PROGRESS BAR */
+.progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--blue);z-index:7000;transition:width 0.1s ease;width:0%}
+
+@media(max-width:768px){
+  section{padding:clamp(56px,8vw,80px) clamp(20px,5vw,32px)}
+  .hero{padding:20px 20px 32px}
+  .cursor,.cursor-ring{display:none}
+  body{cursor:auto}
+  .process-row{grid-template-columns:52px 1fr}
+}
+@media(max-width:480px){
+  .tl-item{grid-template-columns:48px 1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="prog"></div>
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="curRing"></div>
+
+<!-- LOADER -->
+<div class="loader" id="loader">
+  <div class="loader-word"><span id="lw1">WELCOME</span></div>
+  <div class="loader-word" style="color:var(--blue)"><span id="lw2">HYPERFUEL</span></div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="lbar"></div></div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">ONBOARDING</div>
+  <div class="hero-top" id="htop">
+    <span class="htag">Client Onboarding / 2025</span>
+    <div class="hfor">
+      <div class="lbl">Prepared for</div>
+      <div class="nm">HYPERFUEL Clothing</div>
+    </div>
+  </div>
+  <div class="hero-center">
+    <div class="hero-eye" id="heye">Let's Get Started</div>
+    <h1 class="hero-h1">
+      <span class="line"><span id="hl1">WELCOME</span></span>
+      <span class="line"><span id="hl2" class="blue">ABOARD</span></span>
+    </h1>
+    <p class="hero-sub" id="hsub">Everything you need to know about how we work, what we need from you, and how we'll deliver a campaign that hits.</p>
+  </div>
+  <div class="hero-bottom" id="hbot">
+    <div class="hby">
+      <div class="lbl">Your Creative Partner</div>
+      <div class="nm">SHREEVIRAJ</div>
+      <div class="role">Creative Designer & Visual Artist</div>
+    </div>
+    <div class="scroll-cue">
+      <div class="scroll-line"></div>
+      <span>Scroll</span>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-track" id="mtrack"></div>
+</div>
+
+<!-- WELCOME -->
+<section class="s-welcome">
+  <div class="inner">
+    <div class="snum reveal">01</div>
+    <h2 class="stitle reveal d1">GLAD TO HAVE YOU</h2>
+    <p class="welcome-body reveal d2">We're building the full visual direction for HYPERFUEL's launch ecom, editorial, flatlays and reels. This document walks you through the entire process so we're fully aligned before a single frame is created.</p>
+    <div class="welcome-tags reveal d3">
+      <span class="tag">220+ Visuals</span>
+      <span class="tag">10 to 11 SKUs</span>
+      <span class="tag">22 March Start</span>
+      <span class="tag">High-Res PNG</span>
+      <span class="tag">Custom Platform Delivery</span>
+    </div>
+  </div>
+</section>
+
+<!-- BEFORE WE START -->
+<section style="background:var(--black);padding:clamp(72px,10vw,120px) clamp(20px,5vw,48px)">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.3">02</div>
+    <h2 class="stitle reveal d1">BEFORE WE START</h2>
+    <div class="reveal d2" style="max-width:680px">
+      <p style="font-size:clamp(15px,2vw,19px);line-height:1.78;opacity:0.72;margin-bottom:32px">Thank you for trusting us with this. We don't take that lightly.</p>
+      <p style="font-size:clamp(15px,2vw,19px);line-height:1.78;opacity:0.72;margin-bottom:32px">We're here to build a full visual identity for HYPERFUEL something that feels like you, speaks to your audience and holds up across every format and platform.</p>
+      <p style="font-size:clamp(15px,2vw,19px);line-height:1.78;opacity:0.72;margin-bottom:40px">For that to happen, we need you to be <span style="color:var(--blue);font-weight:600">transparent and clear with us throughout the process.</span> The clearer you are about what's in your headspace the references, the feeling, the direction the closer we get to turning that into production grade visuals that actually represent HYPERFUEL.</p>
+      <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-left:3px solid var(--yellow);border-radius:3px;padding:24px 24px">
+        <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:var(--yellow);margin-bottom:10px">Our Ask</div>
+        <p style="font-size:14px;line-height:1.75;color:rgba(255,255,255,0.6)">Share everything even if it feels rough or half-formed. A Pinterest screenshot, a feeling, a word, a brand you saw on the street. The more we understand what lives in your head, the better we can bring it to life. Don't hold back.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="s-checklist">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.3">03</div>
+    <h2 class="stitle reveal d1">WHAT WE NEED FROM YOU</h2>
+    <div class="check-grid reveal d2">
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox checked"></div>
+        <div class="check-content">
+          <div class="check-title">Product Mockups <span class="check-badge badge-req">Received</span></div>
+          <div class="check-desc">Product mockup files received and ready for production.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Physical Product Photos / Ship Products <span class="check-badge badge-req">Required</span></div>
+          <div class="check-desc">High quality photos of all SKUs from multiple angles. Or ship the physical products if required.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox checked"></div>
+        <div class="check-content">
+          <div class="check-title">Brand Guidelines <span class="check-badge badge-req">Received</span></div>
+          <div class="check-desc">Logo files, brand colors and fonts received.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox checked"></div>
+        <div class="check-content">
+          <div class="check-title">Visual Moodboards & References <span class="check-badge badge-req">Received</span></div>
+          <div class="check-desc">Moodboard and visual references received. <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;background:rgba(255,50,80,0.12);color:#ff5060;padding:2px 8px;border-radius:2px;border:1px solid rgba(255,50,80,0.25);white-space:nowrap;display:inline-block;">More Refs Yet to Come</span></div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">SKU List with Names <span class="check-badge badge-req">Required</span></div>
+          <div class="check-desc">Full list of all SKUs with their product names and categories.</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:rgba(255,255,255,0.5);">
+              <span style="font-family:'Space Mono',monospace;color:var(--blue);font-size:11px;margin-top:1px;">+</span>
+              <span>Brief for each SKU what is it, who is it for, what feeling should it give</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:rgba(255,255,255,0.5);">
+              <span style="font-family:'Space Mono',monospace;color:var(--blue);font-size:11px;margin-top:1px;">+</span>
+              <span>Storyline behind the SKU <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;background:rgba(0,181,226,0.1);color:var(--blue);padding:2px 7px;border-radius:2px;margin-left:4px;">If Any</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox checked"></div>
+        <div class="check-content">
+          <div class="check-title">Target Audience Details <span class="check-badge badge-opt">Received</span></div>
+          <div class="check-desc">Age group, vibe and platform preferences received.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox checked"></div>
+        <div class="check-content">
+          <div class="check-title">Competitor & Inspiration Brands <span class="check-badge badge-opt">Received</span></div>
+          <div class="check-desc">Reference brands and visual competitors received.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section class="s-process">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.3">04</div>
+    <h2 class="stitle reveal d1">HOW IT WORKS</h2>
+    <div class="process-wrap reveal d2">
+      <div class="process-row">
+        <div class="process-n">01</div>
+        <div class="process-content">
+          <div class="process-name">ONBOARDING & BRIEF</div>
+          <div class="process-desc">You share all required inputs product images, brand refs, moodboard. We align on the visual direction before anything starts.</div>
+          <span class="process-time">Day 1 to 2</span>
+        </div>
+      </div>
+      <div class="process-row">
+        <div class="process-n">02</div>
+        <div class="process-content">
+          <div class="process-name">MOODBOARD & DIRECTION</div>
+          <div class="process-desc">We create a moodboard based on your inputs and share it for approval. No production begins until you sign off on the direction.</div>
+          <span class="process-time">Day 2 to 4</span>
+        </div>
+      </div>
+      <div class="process-row">
+        <div class="process-n">03</div>
+        <div class="process-content">
+          <div class="process-name">INITIAL PREVIEWS</div>
+          <div class="process-desc">Before full production, we share a set of preview visuals across formats. Your feedback shapes the final output.</div>
+          <span class="process-time">Day 4 to 6</span>
+        </div>
+      </div>
+      <div class="process-row">
+        <div class="process-n">04</div>
+        <div class="process-content">
+          <div class="process-name">FULL PRODUCTION</div>
+          <div class="process-desc">All 220+ visuals created across ecom, editorial and flatlays. Reels produced for 5 SKUs. Workflows maintained for consistency.</div>
+          <span class="process-time">Day 6 to 14</span>
+        </div>
+      </div>
+      <div class="process-row">
+        <div class="process-n">05</div>
+        <div class="process-content">
+          <div class="process-name">REVISIONS</div>
+          <div class="process-desc">2 to 3 rounds of revisions per visual based on your feedback. Share feedback clearly and we'll turnaround fast.</div>
+          <span class="process-time">Day 14 to 18</span>
+        </div>
+      </div>
+      <div class="process-row">
+        <div class="process-n">06</div>
+        <div class="process-content">
+          <div class="process-name">FINAL DELIVERY</div>
+          <div class="process-desc">All assets delivered via a custom platform organized by SKU and format. Access link shared upon final delivery.</div>
+          <span class="process-time">10 to 12 April 2026</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section class="s-timeline">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.4">05</div>
+    <h2 class="stitle reveal d1">TIMELINE</h2>
+    <div class="tl reveal d2">
+      <div class="tl-item">
+        <div class="tl-n">01</div>
+        <div>
+          <div class="tl-t">KICKOFF</div>
+          <div class="tl-d">Onboarding, brief collection and moodboard alignment.</div>
+          <span class="tl-date">22 March 2026</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-n">02</div>
+        <div>
+          <div class="tl-t">PREVIEWS SHARED</div>
+          <div class="tl-d">Initial visuals shared for review before full production.</div>
+          <span class="tl-date">25 to 27 March 2026</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-n">03</div>
+        <div>
+          <div class="tl-t">FULL PRODUCTION</div>
+          <div class="tl-d">All 220+ visuals and reels in production.</div>
+          <span class="tl-date">28 March to 7 April 2026</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-n">04</div>
+        <div>
+          <div class="tl-t">FINAL DELIVERY</div>
+          <div class="tl-d">Organized Drive folder delivered and ready to launch.</div>
+          <span class="tl-date">10 to 12 April 2026</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEEDBACK PROCESS -->
+<section class="s-feedback">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.3">06</div>
+    <h2 class="stitle reveal d1">REVISION PROCESS</h2>
+    <div class="feedback-steps reveal d2">
+      <div class="fb-step">
+        <div class="fb-num">01</div>
+        <div class="fb-title">WE SHARE</div>
+        <div class="fb-desc">Visuals sent over WhatsApp or Email for your review.</div>
+      </div>
+      <div class="fb-step">
+        <div class="fb-num">02</div>
+        <div class="fb-title">YOU FEEDBACK</div>
+        <div class="fb-desc">Share clear, specific feedback what to change, what to keep.</div>
+      </div>
+      <div class="fb-step">
+        <div class="fb-num">03</div>
+        <div class="fb-title">WE REVISE</div>
+        <div class="fb-desc">Revisions done and returned fast. 2 to 3 rounds included per visual.</div>
+      </div>
+      <div class="fb-step">
+        <div class="fb-num">04</div>
+        <div class="fb-title">YOU APPROVE</div>
+        <div class="fb-desc">Once approved, that visual is locked and we move forward.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMUNICATION -->
+<section class="s-checklist-alt" style="background:#0d0d0d;padding:clamp(72px,10vw,120px) clamp(20px,5vw,48px)">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.3">07</div>
+    <h2 class="stitle reveal d1">COMMUNICATION</h2>
+    <div class="comm-grid reveal d2">
+      <div class="comm-card">
+        <span class="comm-icon">◉</span>
+        <div class="comm-name">WHATSAPP</div>
+        <div class="comm-desc">Primary channel for quick updates, previews and day to day coordination.</div>
+      </div>
+      <div class="comm-card">
+        <span class="comm-icon">◈</span>
+        <div class="comm-name">EMAIL</div>
+        <div class="comm-desc">For formal approvals, deliveries and documented feedback.</div>
+      </div>
+      <div class="comm-card">
+        <span class="comm-icon">▣</span>
+        <div class="comm-name">CUSTOM PLATFORM</div>
+        <div class="comm-desc">All assets organized and delivered via our custom delivery platform. Access link shared on delivery.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLIENT CHECKLIST -->
+<section class="s-checklist-blue" style="background:var(--blue);color:var(--black);padding:clamp(72px,10vw,120px) clamp(20px,5vw,48px)">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.4">08</div>
+    <h2 class="stitle reveal d1">YOUR CHECKLIST</h2>
+    <div class="check-grid reveal d2">
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Advance Payment Cleared <span class="check-badge badge-req">Done</span></div>
+          <div class="check-desc">20% advance received. Work begins.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Product Images Shared</div>
+          <div class="check-desc">All SKU images sent to Shreeviraj.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Brand References Shared</div>
+          <div class="check-desc">Moodboard, inspo images and brand guidelines sent.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">SKU List Confirmed</div>
+          <div class="check-desc">Full list of 10 to 11 SKUs with names confirmed.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Moodboard Approved</div>
+          <div class="check-desc">Visual direction signed off before production begins.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Preview Round Approved</div>
+          <div class="check-desc">Initial preview visuals reviewed and approved.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Milestone Payment Cleared</div>
+          <div class="check-desc">40% milestone payment processed.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Final Delivery Approved</div>
+          <div class="check-desc">All assets reviewed and approved for final delivery.</div>
+        </div>
+      </div>
+
+      <div class="check-item" onclick="toggle(this)">
+        <div class="checkbox"></div>
+        <div class="check-content">
+          <div class="check-title">Final Payment Cleared</div>
+          <div class="check-desc">40% final payment processed after delivery.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- DELIVERY STRUCTURE -->
+<section class="s-delivery">
+  <div class="inner">
+    <div class="snum reveal" style="opacity:0.3">09</div>
+    <h2 class="stitle reveal d1">DELIVERY STRUCTURE</h2>
+    <div class="del-info reveal d2">
+      <div class="del-info-head">
+        <div class="del-info-head-title">HYPERFUEL CAMPAIGN / CUSTOM PLATFORM</div>
+      </div>
+      <div class="del-info-body">
+        <div class="del-folder">
+          <div class="del-folder-name">Ecom</div>
+          <div class="del-folder-items">
+            <div class="del-folder-item">SKU 01 / 2:3 / 9:16 / 16:9</div>
+            <div class="del-folder-item">SKU 02 / 2:3 / 9:16 / 16:9</div>
+            <div class="del-folder-item">... and so on per SKU</div>
+          </div>
+        </div>
+        <div class="del-folder">
+          <div class="del-folder-name">Editorial</div>
+          <div class="del-folder-items">
+            <div class="del-folder-item">SKU 01 / 2:3</div>
+            <div class="del-folder-item">SKU 02 / 2:3</div>
+            <div class="del-folder-item">... and so on per SKU</div>
+          </div>
+        </div>
+        <div class="del-folder">
+          <div class="del-folder-name">Flatlays</div>
+          <div class="del-folder-items">
+            <div class="del-folder-item">SKU 01 / 2:3</div>
+            <div class="del-folder-item">SKU 02 / 2:3</div>
+            <div class="del-folder-item">... and so on per SKU</div>
+          </div>
+        </div>
+        <div class="del-folder">
+          <div class="del-folder-name">Reels</div>
+          <div class="del-folder-items">
+            <div class="del-folder-item">SKU 01 / 9:16</div>
+            <div class="del-folder-item">SKU 02 / 9:16</div>
+            <div class="del-folder-item">5 SKUs total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="ft-bg">SHREEVIRAJ</div>
+  <div class="ft-name">SHREEVIRAJ</div>
+  <div class="ft-role">Creative Designer & Visual Artist</div>
+  <div class="ft-tag">Built for HYPERFUEL / 2025</div>
+</footer>
+
+<script>
+// CURSOR
+const cur=document.getElementById('cur');
+const curRing=document.getElementById('curRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+function animRing(){rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;curRing.style.left=rx+'px';curRing.style.top=ry+'px';requestAnimationFrame(animRing)}
+animRing();
+
+// PROGRESS
+window.addEventListener('scroll',()=>{
+  const p=(window.scrollY/(document.body.scrollHeight-window.innerHeight))*100;
+  document.getElementById('prog').style.width=p+'%';
+});
+
+// LOADER
+window.addEventListener('load',()=>{
+  const lw1=document.getElementById('lw1');
+  const lw2=document.getElementById('lw2');
+  const lbar=document.getElementById('lbar');
+  const loader=document.getElementById('loader');
+  setTimeout(()=>lw1.classList.add('up'),100);
+  setTimeout(()=>lw2.classList.add('up'),280);
+  setTimeout(()=>lbar.style.width='100%',350);
+  setTimeout(()=>{
+    loader.classList.add('done');
+    document.getElementById('htop').classList.add('on');
+    document.getElementById('heye').classList.add('on');
+    setTimeout(()=>document.getElementById('hl1').classList.add('up'),200);
+    setTimeout(()=>document.getElementById('hl2').classList.add('up'),360);
+    setTimeout(()=>document.getElementById('hsub').classList.add('on'),600);
+    setTimeout(()=>document.getElementById('hbot').classList.add('on'),800);
+  },1400);
+});
+
+// MARQUEE
+const words=['HYPERFUEL','ONBOARDING','220+ VISUALS','4K OUTPUT','ECOM','EDITORIAL','FLATLAYS','REELS','22 MARCH','LET\'S GO'];
+const track=document.getElementById('mtrack');
+const full=words.map(w=>`<span>${w}</span><span class="dot">✦</span>`).join('');
+track.innerHTML=full+full;
+
+// REVEAL
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('on')});
+},{threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+// CHECKBOX TOGGLE with localStorage
+function toggle(el){
+  const cb=el.querySelector('.checkbox');
+  cb.classList.toggle('checked');
+  saveState();
+}
+
+function saveState(){
+  const all=document.querySelectorAll('.check-item');
+  const states=[];
+  all.forEach(el=>{
+    states.push(el.querySelector('.checkbox').classList.contains('checked'));
+  });
+  localStorage.setItem('hf-checklist',JSON.stringify(states));
+}
+
+function loadState(){
+  const saved=localStorage.getItem('hf-checklist');
+  if(!saved)return;
+  const states=JSON.parse(saved);
+  const all=document.querySelectorAll('.check-item');
+  all.forEach((el,i)=>{
+    if(states[i])el.querySelector('.checkbox').classList.add('checked');
+    else el.querySelector('.checkbox').classList.remove('checked');
+  });
+}
+
+loadState();
+</script>
+</body>
+</html>
