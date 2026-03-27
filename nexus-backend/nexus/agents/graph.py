@@ -5,6 +5,7 @@ from langgraph.checkpoint.memory import MemorySaver
 import services.db_service as db_service
 from groq import Groq
 from dotenv import load_dotenv
+
 load_dotenv()
 MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 ESCALATION_THRESHOLD = int(os.getenv("ESCALATION_THRESHOLD", "70"))
@@ -14,7 +15,6 @@ _groq_client = None
 _local_model  = None
 _local_tok    = None
 
-
 def _get_groq_client():
     global _groq_client
     if _groq_client is None:
@@ -23,7 +23,6 @@ def _get_groq_client():
             raise RuntimeError("Missing GROQ_API_KEY in environment")
         _groq_client = Groq(api_key=api_key)
     return _groq_client
-
 
 def _get_local_model():
     """Lazy-load the fine-tuned T5 model from disk (GPU if available)."""
@@ -43,7 +42,6 @@ def _get_local_model():
             print(f"[Local LLM] Failed to load: {e}")
             _local_model = None
     return _local_model, _local_tok
-
 
 def _llm_local(system: str, user: str) -> dict | str:
     """Run a query through the local fine-tuned T5 model."""
@@ -69,7 +67,6 @@ def _llm_local(system: str, user: str) -> dict | str:
         print(f"[Local LLM] Inference failed: {e}")
         return {}
 
-
 # ── Shared State (flows through every node) ─────────────────
 class AgentState(TypedDict):
     # Input
@@ -81,7 +78,7 @@ class AgentState(TypedDict):
     attachments:     list[dict]      # [{name, content, type}]
     all_thread_emails: list[dict]
     force_intent:     str
-    project_id:       str             # Supabase link for full context retrieval
+    project_id:       str            # 🟢 ADDED: Supabase link for full context retrieval
 
     # Intent parsing
     intent:          str             # email | schedule | cancel | status | brd | escalate | general
@@ -118,29 +115,19 @@ class AgentState(TypedDict):
     action_taken:    str
     error:           str
 
-
 def _parse_json_loose(text: str) -> dict | None:
     try:
         return json.loads(text)
     except Exception:
         pass
-
-    # Best-effort cleanup for common LLM JSON issues: trailing commas.
     cleaned = re.sub(r",\s*([}\]])", r"\1", text)
     try:
         return json.loads(cleaned)
     except Exception:
         return None
 
-
 def _llm(system: str, user: str, max_retries: int = 3) -> dict | str:
-    """
-    Tiered LLM Dispatcher with Resilience:
-    1. Try Groq (Model of choice for quality).
-    2. Retry on 429 (Rate Limit) with exponential backoff.
-    3. Fall back to local T5 only if all else fails.
-    """
-    # 1. Try Groq with backoff
+    """Tiered LLM Dispatcher with Resilience"""
     for attempt in range(max_retries):
         try:
             client = _get_groq_client()
@@ -162,21 +149,17 @@ def _llm(system: str, user: str, max_retries: int = 3) -> dict | str:
                 parsed = _parse_json_loose(m.group(0))
                 if parsed is not None:
                     return parsed
-            # Return raw if not JSON but call succeeded
             return raw
 
         except Exception as e:
             err_msg = str(e)
             print(f"[LLM] Groq attempt {attempt+1} failed: {err_msg[:120]}")
             
-            # If it's a rate limit (429), sleep and retry
             if "429" in err_msg or "rate_limit" in err_msg.lower():
-                wait = (2 ** attempt) * 2 # 2s, 4s, 8s...
+                wait = (2 ** attempt) * 2
                 print(f"[LLM] Rate limit hit. Backing off for {wait}s...")
                 time.sleep(wait)
                 continue
-            
-            # For other errors, break and fall back
             break
 
     # 2. Final Fallback to local
@@ -185,20 +168,6 @@ def _llm(system: str, user: str, max_retries: int = 3) -> dict | str:
         return _llm_local(system, user)
     
     return {}
-
-    raw = re.sub(r"```json\n?|\n?```", "", raw).strip()
-    parsed = _parse_json_loose(raw)
-    if parsed is not None:
-        return parsed
-
-    # Try to recover a JSON object from mixed text output.
-    m = re.search(r"\{.*\}", raw, flags=re.S)
-    if m:
-        parsed = _parse_json_loose(m.group(0))
-        if parsed is not None:
-            return parsed
-    return raw
-
 
 def _heuristic_intent(subject: str, body: str, force_intent: str = "") -> tuple[str, int, str, bool, str, str]:
     text = f"{subject}\n{body}".lower()
@@ -235,11 +204,6 @@ def _heuristic_intent(subject: str, body: str, force_intent: str = "") -> tuple[
     reason = "Keyword-based fallback urgency."
     return intent, urgency, sentiment, is_business, category, reason
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 1 — Intent Router
-# Decides which downstream agent handles this email
-# ══════════════════════════════════════════════════════════════
 def intent_router_node(state: AgentState) -> AgentState:
     if state.get("force_intent") == "brd":
         state["intent"] = "brd"
@@ -268,15 +232,7 @@ def intent_router_node(state: AgentState) -> AgentState:
   "wants_brd": false,
   "summary": "one sentence",
   "entities": {"names":[], "orgs":[], "dates":[]}
-}
-
-Rules:
-- is_business_email=false for newsletters/promotions/otp/security alerts/social notifications.
-- intent=brd if email contains: 'requirements document', 'BRD', 'business requirements', 'spec document', 'write up requirements', 'document the project'
-- intent=escalate if urgency_score > 70 OR sentiment = frustrated/urgent
-- intent=schedule if any meeting/call/sync requested
-- intent=status if asking for update/progress
-"""
+}"""
     result = _llm(system, f"From: {state['sender']}\nSubject: {state['subject']}\n\nBody:\n{state['body'][:2000]}")
 
     if isinstance(result, dict) and result:
@@ -315,41 +271,27 @@ Rules:
 
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 2 — BRD Extraction Agent
-# Extracts structured requirements from email + thread context
-# ══════════════════════════════════════════════════════════════
 def brd_extraction_node(state: AgentState) -> AgentState:
-    # 1. If we have a project_id, pull the DEEP context from Supabase (all past emails + docs)
     project_id = state.get("project_id")
+    # 🟢 FIX: This correctly grabs the massive string from Supabase
     if project_id:
         print(f"[Agent] Retrieving proper context for Project: {project_id}")
-        all_content = db_service.get_project_context(project_id)
+        all_content = db_service.get_project_context_string(project_id)
     else:
-        # Fallback to current email/thread if no project linked yet
         all_content = state["body"]
         for prev in state.get("all_thread_emails", [])[-5:]:
             all_content += f"\n\n---\nFrom: {prev.get('sender','')}\n{prev.get('body','')[:800]}"
 
-    # 2. Also include any local session attachments
     for att in state.get("attachments", []):
         if att.get("content"):
             all_content += f"\n\n--- ATTACHMENT: {att['name']} ---\n{att['content'][:1500]}"
 
-    # 3. Advanced NLP Pre-processing: Noise Reduction (Enron / AMI filters)
     def clean_noisy_content(text: str) -> str:
-        import re
-        # Remove Enron header noise (Message-ID, X-To, X-From)
         text = re.sub(r"(?i)(Message-ID|Date|From|To|Subject|Mime-Version|Content-Type|X-[a-zA-Z-]+):.*?\n", "", text)
-        # Remove transcript filler words (AMI dataset noise)
         text = re.sub(r"\b(um|uh|like|you know|I mean|yeah|okay|right)\b", "", text, flags=re.IGNORECASE)
-        # Compress multiple newlines
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
     cleaned_content = clean_noisy_content(all_content)
-    
-    # 4. Expanded clean context window
     context_to_process = cleaned_content[:8000]
 
     system = """You are a senior business analyst. Extract ALL requirements from these communications.
@@ -377,11 +319,9 @@ Return ONLY valid JSON:
     if isinstance(result, dict) and result:
         state["brd_extracted"] = result
     else:
-        # DEEP HEURISTIC FALLBACK: If LLM fails, we manually construct a project-specific skeleton
-        # instead of a generic "Recovery" document.
         print("[Agent] LLM Extraction failed. Using Deep Heuristic Fallback for extraction.")
         subj = (state.get("subject") or "Project").replace("BRD:", "").strip()[:80]
-        desc = state.get("body", "")[:1000] # Use more body content
+        desc = state.get("body", "")[:1000]
         
         state["brd_extracted"] = {
             "project_name": subj or "Requirement Document",
@@ -403,10 +343,6 @@ Return ONLY valid JSON:
         }
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 3 — BRD Gap Detector
-# ══════════════════════════════════════════════════════════════
 def brd_gap_node(state: AgentState) -> AgentState:
     system = """Review this extracted BRD data for completeness. Return ONLY valid JSON:
 {
@@ -414,36 +350,23 @@ def brd_gap_node(state: AgentState) -> AgentState:
   "can_proceed": true,
   "critical_gaps": [{"field":"","issue":"","question":""}],
   "recommended_questions": [{"priority":"must_have|nice_to_have","question":"","why":""}]
-}
-Set can_proceed=false only if >3 critical gaps exist."""
-
+}"""
     result = _llm(system, f"Extracted data:\n{json.dumps(state.get('brd_extracted',{}), indent=2)[:3000]}")
     if isinstance(result, dict):
         state["brd_gaps"] = result
-        # If gaps are not critical, proceed
         if not result.get("can_proceed", True):
             state["needs_human"] = True
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 4 & 5 — High-Efficiency BRD Generator (Single Call)
-# ══════════════════════════════════════════════════════════════
 async def _generate_brd_section(project_name: str, section_key: str, section_desc: str, extracted: dict) -> str:
-    """Helper to generate a single BRD section if the master call fails."""
     system = f"You are a Business Analyst. Write the '{section_key}' section for '{project_name}'. {section_desc}. Return ONLY the text content."
     user = f"Context: {json.dumps(extracted, indent=2)[:3000]}"
     res = await asyncio.get_event_loop().run_in_executor(None, _llm, system, user)
     return str(res) if res else "Context unavailable for this section."
 
 async def brd_writer_node(state: AgentState) -> AgentState:
-    """
-    High-Efficiency BRD Generator.
-    Tries a single efficient call first, falls back to section-by-section if needed.
-    """
     extracted = state.get("brd_extracted", {})
     project_name = extracted.get("project_name", state.get("subject", "Project")).replace("BRD:", "").strip()
-    
     ctx = json.dumps(extracted, indent=2)[:4000]
 
     system = f"""You are a Lead Business Analyst. Create a FINAL Business Requirements Document for '{project_name}'.
@@ -474,7 +397,6 @@ Return ONLY valid JSON with this EXACT structure:
         state["brd_sections"] = result["sections"]
         return state
 
-    # --- LAYER 2 FALLBACK: Section-by-Section ---
     print(f"[LLM] Primary BRD call failed for {project_name}. Falling back to Section-by-Section generation...")
     sections_schema = {
         "executive_summary": "Summarize the project vision and problem being solved",
@@ -489,10 +411,17 @@ Return ONLY valid JSON with this EXACT structure:
     }
     
     final_sections = {}
-    for key, desc in sections_schema.items():
-        # Generate each section individually to stay under token limits / prevent JSON parsing bombs
-        final_sections[key] = await _generate_brd_section(project_name, key, desc, extracted)
-        await asyncio.sleep(0.5) # Slight pause to avoid hitting rate limits between chunks
+    semaphore = asyncio.Semaphore(2)
+
+    async def _guarded_section(key: str, desc: str) -> tuple[str, str]:
+        async with semaphore:
+            text = await _generate_brd_section(project_name, key, desc, extracted)
+            await asyncio.sleep(2)
+            return key, text
+
+    tasks = [_guarded_section(key, desc) for key, desc in sections_schema.items()]
+    for key, text in await asyncio.gather(*tasks):
+        final_sections[key] = text
 
     state["brd_sections"] = final_sections
     state["brd_final"] = {
@@ -504,16 +433,9 @@ Return ONLY valid JSON with this EXACT structure:
     }
     return state
 
-
 def brd_assembler_node(state: AgentState) -> AgentState:
-    """Now a pass-through because writer handles everything."""
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 6 — Calendar Agent
-# Uses real Google Calendar freebusy API
-# ══════════════════════════════════════════════════════════════
 def calendar_agent_node(state: AgentState) -> AgentState:
     from services.calendar_service import find_free_slot, create_event
     from services.google_auth import load_credentials
@@ -527,7 +449,6 @@ def calendar_agent_node(state: AgentState) -> AgentState:
         state["error"] = "Google not authenticated"
         return state
 
-    # Normalize participants to valid email addresses only.
     participants_raw = state.get("participants", []) or []
     participants = []
     for p in participants_raw:
@@ -537,15 +458,11 @@ def calendar_agent_node(state: AgentState) -> AgentState:
         if addr and addr not in participants:
             participants.append(addr)
 
-    # Fall back to sender email for scheduling requests if model missed participants.
     sender_addr = parseaddr(state.get("sender", ""))[1]
     if not participants and sender_addr:
         participants = [sender_addr]
 
-    # Normalize proposed slots to datetime
-    duration     = 30  # default
-
-    # Try to find slot from proposed times first
+    duration = 30
     preferred = None
     for slot in state.get("proposed_slots", []):
         raw = slot.get("date_raw", "")
@@ -567,7 +484,6 @@ def calendar_agent_node(state: AgentState) -> AgentState:
 
     if free_slot:
         state["free_slot"] = free_slot.isoformat()
-        # Create the real calendar event
         try:
             event = create_event(
                 creds,
@@ -590,11 +506,6 @@ def calendar_agent_node(state: AgentState) -> AgentState:
 
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 7 — Reply Composer
-# Drafts the outgoing email
-# ══════════════════════════════════════════════════════════════
 def reply_composer_node(state: AgentState) -> AgentState:
     intent = state.get("intent", "general")
 
@@ -616,8 +527,6 @@ This message was generated autonomously. Reply if corrections needed.
 Return ONLY valid JSON: {{"subject":"Re: ...","body":"full email text"}}"""
 
     context = f"Original email: {state['subject']}\nFrom: {state['sender']}\nIntent: {intent}\nSummary: {state.get('entities',{})}{meeting_info}"
-
-    # Use human edits if provided
     if state.get("human_edits"):
         context += f"\n\nHuman requested changes: {state['human_edits']}"
 
@@ -626,7 +535,6 @@ Return ONLY valid JSON: {{"subject":"Re: ...","body":"full email text"}}"""
         state["draft_subject"] = result.get("subject", f"Re: {state['subject']}")
         state["draft_body"]    = result.get("body", "")
     elif isinstance(result, str) and result.strip():
-        # If model didn't return JSON but did generate text, still use it.
         state["draft_subject"] = state.get("draft_subject") or f"Re: {state.get('subject','Update')}"
         state["draft_body"] = result.strip()
     if not state.get("draft_body"):
@@ -637,21 +545,12 @@ Return ONLY valid JSON: {{"subject":"Re: ...","body":"full email text"}}"""
         )
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# NODE 8 — Escalation Handler
-# Routes to human, stops auto-send
-# ══════════════════════════════════════════════════════════════
 def escalation_node(state: AgentState) -> AgentState:
     state["needs_human"] = True
     state["action_taken"] = "escalated"
-    state["draft_body"] = None  # Don't draft — human writes this
+    state["draft_body"] = None
     return state
 
-
-# ══════════════════════════════════════════════════════════════
-# ROUTING FUNCTIONS
-# ══════════════════════════════════════════════════════════════
 def route_intent(state: AgentState) -> Literal["n_brd_extract","n_calendar","n_escalate","n_compose"]:
     intent = state.get("intent", "general")
     if intent == "escalate":
@@ -667,11 +566,10 @@ def route_intent(state: AgentState) -> Literal["n_brd_extract","n_calendar","n_e
 def route_after_brd_gaps(state: AgentState) -> Literal["n_brd_write","n_escalate"]:
     gaps = state.get("brd_gaps", {})
     if not gaps.get("can_proceed", True) and state.get("urgency_score", 0) < ESCALATION_THRESHOLD:
-        return "n_escalate"  # needs human clarification
+        return "n_escalate" 
     return "n_brd_write"
 
 def route_after_calendar(state: AgentState) -> Literal["n_compose","n_escalate"]:
-    # Missing slot should still get a draft reply rather than forced escalation.
     return "n_compose"
 
 def route_final(state: AgentState) -> Literal["end","n_escalate"]:
@@ -679,14 +577,8 @@ def route_final(state: AgentState) -> Literal["end","n_escalate"]:
         return "n_escalate"
     return "end"
 
-
-# ══════════════════════════════════════════════════════════════
-# BUILD THE LANGGRAPH
-# ══════════════════════════════════════════════════════════════
 def build_graph():
     builder = StateGraph(AgentState)
-
-    # Add nodes
     builder.add_node("n_intent_router",    intent_router_node)
     builder.add_node("n_brd_extract",      brd_extraction_node)
     builder.add_node("n_brd_gaps",         brd_gap_node)
@@ -696,10 +588,8 @@ def build_graph():
     builder.add_node("n_compose",          reply_composer_node)
     builder.add_node("n_escalate",         escalation_node)
 
-    # Entry point
     builder.set_entry_point("n_intent_router")
 
-    # Routing from intent
     builder.add_conditional_edges("n_intent_router", route_intent, {
         "n_brd_extract": "n_brd_extract",
         "n_calendar":    "n_calendar",
@@ -707,7 +597,6 @@ def build_graph():
         "n_compose":     "n_compose",
     })
 
-    # BRD pipeline
     builder.add_edge("n_brd_extract", "n_brd_gaps")
     builder.add_conditional_edges("n_brd_gaps", route_after_brd_gaps, {
         "n_brd_write":  "n_brd_write",
@@ -716,13 +605,11 @@ def build_graph():
     builder.add_edge("n_brd_write",   "n_brd_assemble")
     builder.add_edge("n_brd_assemble","n_compose")
 
-    # Calendar pipeline
     builder.add_conditional_edges("n_calendar", route_after_calendar, {
         "n_compose":  "n_compose",
         "n_escalate": "n_escalate",
     })
 
-    # Final routing
     builder.add_conditional_edges("n_compose", route_final, {
         "end":      END,
         "n_escalate": "n_escalate",
@@ -732,8 +619,6 @@ def build_graph():
     memory = MemorySaver()
     return builder.compile(checkpointer=memory)
 
-
-# Singleton graph
 _graph = None
 def get_graph():
     global _graph
@@ -741,11 +626,8 @@ def get_graph():
         _graph = build_graph()
     return _graph
 
-
 async def run_agent(email: dict, thread_emails: list = None, human_edits: str = None) -> AgentState:
-    """Run full LangGraph pipeline for one email."""
     graph = get_graph()
-
     initial_state: AgentState = {
         "email_id":          email.get("id", ""),
         "thread_id":         email.get("thread_id", ""),
@@ -763,6 +645,7 @@ async def run_agent(email: dict, thread_emails: list = None, human_edits: str = 
         "business_category": "other",
         "urgency_reason":    "",
         "force_intent":      email.get("force_intent", ""),
+        "project_id":        email.get("project_id", ""), # 🟢 ADDED: Passes Supabase ID into Graph
         "brd_extracted":     {},
         "brd_gaps":          {},
         "brd_sections":      {},
@@ -781,7 +664,5 @@ async def run_agent(email: dict, thread_emails: list = None, human_edits: str = 
         "action_taken":      "",
         "error":             "",
     }
-
     config = {"configurable": {"thread_id": email.get("thread_id", "default")}}
-    result = await graph.ainvoke(initial_state, config=config)
-    return result
+    return await graph.ainvoke(initial_state, config=config)

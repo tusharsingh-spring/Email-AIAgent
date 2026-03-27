@@ -610,7 +610,7 @@ code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-family:'DM Mon
 
 <script>
 const API = 'http://localhost:8000';
-let ws = null, state = {actions:[], events:[], emails:[], brds:{}, authenticated:false};
+let ws = null, state = {actions:[], events:[], emails:[], brds:{}, authenticated:false, brdRunning:{}};
 let actFilter = 'all';
 
 /* ── WebSocket ── */
@@ -678,10 +678,13 @@ function log(type, msg) {
                                 <div class="ac-from">${p.name}</div>
                                 <div class="ac-sub">${p.status} • Created ${new Date(p.created_at).toLocaleDateString()}</div>
                             </div>
+                    <button class="btn btn-a btn-sm" data-brd-btn="${p.id}" onclick="event.stopPropagation(); generateProjectBRD('${p.id}')">⚡ Generate BRD</button>
                         </div>
+                  <div style="font-size:10px;color:var(--tx3);margin-top:6px" id="brd-status-${p.id}"></div>
                     `;
                     list.appendChild(div);
                 });
+              renderProjectsRunning();
             }
 
             async function selectProject(p) {
@@ -692,20 +695,45 @@ function log(type, msg) {
                 // Load context
                 const res = await fetch(`/api/projects/${p.id}/context`);
                 const ctx = await res.json();
+
+              const emails = (ctx.emails||[]).slice(0,5).map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><div style="font-size:10px;color:var(--tx3)">${e.sender||''}</div><div style="font-size:11px;font-weight:600">${e.subject||'(no subject)'}</div><div style="font-size:10px;color:var(--tx2);white-space:pre-wrap">${(e.body||'').slice(0,240)}</div></div>`).join('') || '<div class="empty">No linked emails yet.</div>';
+              const docs = (ctx.documents||[]).slice(0,5).map(d=>`<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><div style="font-size:11px;font-weight:600">${d.filename}</div><div style="font-size:10px;color:var(--tx3)">${d.type||'document'}</div><div style="font-size:10px;color:var(--tx2);white-space:pre-wrap">${(d.content||'').slice(0,200)}</div></div>`).join('') || '<div class="empty">No documents yet.</div>';
+              document.getElementById('pd-emails').innerHTML = emails + docs;
                 
-                // Mocking extraction for demo - in real we pull list of entities
-                document.getElementById('pd-emails').innerHTML = 'Context retrieved properly from Supabase.';
-                
-                // Show BRD generation button
-                document.getElementById('pd-actions').innerHTML = `
-                    <button class="btn btn-a btn-sm" onclick="generateProjectBRD('${p.id}')">Generate BRD</button>
-                    <button class="btn btn-g btn-sm" onclick="showAttachResources('${p.id}')">Attach Resources</button>
-                `;
+              // Show BRD generation button
+              document.getElementById('pd-actions').innerHTML = `
+                <button class="btn btn-a btn-sm" data-brd-btn="${p.id}" onclick="generateProjectBRD('${p.id}')">⚡ Generate BRD</button>
+                <button class="btn btn-g btn-sm" onclick="showAttachResources('${p.id}')">Attach Resources</button>
+                <div style="font-size:10px;color:var(--tx3);margin-top:6px" id="brd-status-${p.id}"></div>
+              `;
+              renderProjectsRunning();
             }
 
             async function generateProjectBRD(id) {
-                toast('⚡ Initiating Project-Wide BRD extraction...');
-                // ... trigger backend ...
+              try {
+                const btns = document.querySelectorAll(`[data-brd-btn="${id}"]`);
+                btns.forEach(b=>{b.disabled=true; b.textContent='… Generating';});
+                state.brdRunning[id] = true;
+                renderProjectsRunning();
+                toast('⚡ Initiating Project-Wide BRD extraction...','ok');
+                startBRDProgressAnim();
+                const res = await fetch(`${API}/api/projects/${id}/generate-brd`, {method:'POST'});
+                const d = await res.json();
+                if(d.error){ toast(d.error,'warn'); delete state.brdRunning[id]; }
+                else if(d.status==='already_running'){ toast('BRD already running for this project','warn'); }
+              } catch(e){ toast('Backend not running','warn'); delete state.brdRunning[id]; }
+              renderProjectsRunning();
+            }
+
+            function renderProjectsRunning() {
+              document.querySelectorAll('[id^="brd-status-"]').forEach(el=>{el.textContent='';});
+              document.querySelectorAll('[data-brd-btn]').forEach(b=>{b.disabled=false; b.textContent='⚡ Generate BRD';});
+              Object.entries(state.brdRunning||{}).forEach(([pid,r])=>{
+                const statusEl=document.getElementById(`brd-status-${pid}`);
+                if(statusEl) statusEl.textContent = r ? 'Generating BRD…' : '';
+                const btns=document.querySelectorAll(`[data-brd-btn="${pid}"]`);
+                btns.forEach(b=>{b.disabled=r; b.textContent = r ? '… Generating' : '⚡ Generate BRD';});
+              });
             }
 
             function setProjTab(t, el) {
@@ -835,7 +863,8 @@ function handle(msg) {
   if (msg.type === 'escalation')   { state.actions.unshift(msg.payload); renderDash(); renderActions(); renderEsc(); updateBadges(); toast('ESCALATED: '+msg.payload.email?.subject,'warn'); }
   if (msg.type === 'action_update'){ const a=state.actions.find(x=>x.id===msg.id); if(a)a.status=msg.status; renderActions(); updateBadges(); }
   if (msg.type === 'meeting_created'){ state.events.unshift(msg.meeting); renderDash(); toast('Calendar event created: '+msg.meeting.title,'ok'); }
-  if (msg.type === 'brd_ready')   { state.brds[msg.job_id]={title:msg.title}; renderBRD(); updateBadges(); toast('BRD ready: '+msg.title,'ok'); advanceBRDProgress('docx'); }
+  if (msg.type === 'brd_stage')   { if(msg.stage) advanceBRDProgress(msg.stage); if(msg.project_id) state.brdRunning[msg.project_id]=true; }
+  if (msg.type === 'brd_ready')   { state.brds[msg.job_id]={title:msg.title}; renderBRD(); updateBadges(); toast('BRD ready: '+msg.title,'ok'); advanceBRDProgress('docx'); if(msg.project_id) delete state.brdRunning[msg.project_id]; renderProjectsRunning(); }
   if (msg.type === 'auth')        { state.authenticated=true; updateAuth(true); const lbl=document.getElementById('owner-lbl'); if(lbl) lbl.textContent=msg.email||'Connected'; toast('Google connected!','ok'); }
 }
 
