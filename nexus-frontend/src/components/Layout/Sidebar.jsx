@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Settings2, Activity, AlertTriangle, BarChart2, Inbox, FileText, Command, X } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Settings2, Activity, AlertTriangle, BarChart2, Inbox, FileText, Command, X, Upload, CalendarRange, Map, Bot, Brain } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 
 const NAV_GROUPS = [
@@ -21,8 +21,13 @@ const NAV_GROUPS = [
     label: 'Intelligence',
     items: [
       { name: 'Metrics', path: '/metrics', icon: BarChart2 },
+      { name: 'Bandit Lab', path: '/bandit', icon: Brain },
       { name: 'Inbox', path: '/inbox', icon: Inbox },
       { name: 'BRDs', path: '/brds', icon: FileText },
+      { name: 'Calendar', path: '/calendar', icon: CalendarRange },
+      { name: 'Project Map', path: '/map', icon: Map },
+      { name: 'Upload Resources', path: '/upload', icon: Upload },
+      { name: 'Assistant', path: '/assistant', icon: Bot },
     ]
   },
   {

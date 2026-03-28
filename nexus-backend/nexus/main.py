@@ -2,7 +2,7 @@
 NEXUS — FastAPI Main
 Email Listener + LangGraph Agent + BRD Pipeline + Calendar + WebSocket
 """
-import asyncio, json, os, uuid, tempfile, re
+import asyncio, json, os, uuid, tempfile, re, random
 from email.utils import parseaddr
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -51,7 +51,9 @@ store = {
     "ws_clients":   [],
     "summaries":    [],
     "cluster_agent": None,
+    "bandit": {"stats": {}, "log": [], "epsilon": float(os.getenv("BANDIT_EPSILON", "0.2"))},
 }
+BANDIT_STATE_PATH = os.getenv("BANDIT_STATE_PATH", os.path.join(os.path.dirname(__file__), "data_bandit_state.json"))
 MAX_EMAIL_FETCH = int(os.getenv("MAX_EMAIL_FETCH", "5"))
 AUTO_SEND_REPLIES = os.getenv("AUTO_SEND_REPLIES", "true").lower() in ("1", "true", "yes", "on")
 
@@ -120,6 +122,115 @@ def suggest_project_for_email(email: dict) -> dict | None:
         "confidence": score,
         "reason": why or "overlap"
     }
+
+
+# ── Bandit wrapper (ε-greedy) ───────────────────────────────
+def _bandit_state():
+    state = store.setdefault("bandit", {})
+    state.setdefault("stats", {})
+    state.setdefault("log", [])
+    if "epsilon" not in state:
+        state["epsilon"] = float(os.getenv("BANDIT_EPSILON", "0.2"))
+
+    # Lazy-load persisted state once
+    if not state.get("_loaded", False):
+        try:
+            if os.path.exists(BANDIT_STATE_PATH):
+                with open(BANDIT_STATE_PATH, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                state["stats"] = saved.get("stats", {})
+                state["log"] = saved.get("log", [])
+                state["epsilon"] = saved.get("epsilon", state["epsilon"])
+        except Exception as e:
+            print(f"[Bandit] Failed to load persisted state: {e}")
+        state["_loaded"] = True
+    return state
+
+
+def _persist_bandit_state():
+    state = _bandit_state().copy()
+    state.pop("_loaded", None)
+    try:
+        with open(BANDIT_STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump({
+                "epsilon": state.get("epsilon", 0.2),
+                "stats": state.get("stats", {}),
+                "log": state.get("log", [])[-500:],  # cap log size
+            }, f)
+    except Exception as e:
+        print(f"[Bandit] Failed to persist state: {e}")
+
+
+def bandit_project_suggestion(email: dict) -> dict | None:
+    """Pick a project using ε-greedy over mean reward, with heuristic as a prior."""
+    try:
+        projects = db_service.get_projects()
+    except Exception:
+        return None
+    if not projects:
+        return None
+
+    bandit = _bandit_state()
+    stats: dict = bandit["stats"]
+    eps = bandit.get("epsilon", 0.2)
+
+    heuristic = suggest_project_for_email(email)
+    base_scores = {}
+    for p in projects:
+        st = stats.get(p["id"], {"wins": 0.0, "plays": 0.0})
+        # Laplace smoothing keeps cold-start arms viable
+        mean_reward = (st["wins"] + 1.0) / (st["plays"] + 2.0)
+        prior_boost = 0.0
+        if heuristic and heuristic.get("project_id") == p.get("id"):
+            prior_boost = 0.1 + 0.01 * float(heuristic.get("confidence") or 0)
+        base_scores[p["id"]] = mean_reward + prior_boost
+
+    explore = random.random() < eps
+    if explore:
+        chosen = random.choice(projects)
+        reason = f"explore eps={eps:.2f}"
+    else:
+        chosen_id = max(base_scores, key=base_scores.get)
+        chosen = next(p for p in projects if p.get("id") == chosen_id)
+        reason = "exploit mean reward"
+        if heuristic and chosen_id == heuristic.get("project_id"):
+            reason += " + heuristic"
+
+    stats.setdefault(chosen["id"], {"wins": 0.0, "plays": 0.0})
+    stats[chosen["id"]]["plays"] += 1.0
+    bandit.setdefault("log", []).append({
+        "ts": datetime.utcnow().isoformat(),
+        "email_id": email.get("id"),
+        "project_id": chosen.get("id"),
+        "action": "suggest",
+        "reason": reason,
+        "epsilon": eps,
+    })
+    _persist_bandit_state()
+
+    conf = round(base_scores.get(chosen["id"], 0.0), 3)
+    return {
+        "project_id": chosen.get("id"),
+        "project_name": chosen.get("name"),
+        "confidence": conf,
+        "reason": reason,
+    }
+
+
+def bandit_reward(project_id: str, reward: float = 1.0, email_id: str | None = None, event: str = "reward"):
+    bandit = _bandit_state()
+    stats: dict = bandit["stats"]
+    st = stats.setdefault(project_id, {"wins": 0.0, "plays": 0.0})
+    st["wins"] = max(0.0, st.get("wins", 0.0) + reward)
+    bandit.setdefault("log", []).append({
+        "ts": datetime.utcnow().isoformat(),
+        "project_id": project_id,
+        "email_id": email_id,
+        "action": event,
+        "reward": reward,
+    })
+    _persist_bandit_state()
+    return st
 
 
 # ── WebSocket broadcast ────────────────────────────────────
@@ -344,7 +455,7 @@ async def process_email(email: dict, thread_emails_override: list = None):
         return
 
     # Project suggestion (for mapping UI)
-    project_suggestion = suggest_project_for_email(email)
+    project_suggestion = bandit_project_suggestion(email) or suggest_project_for_email(email)
 
     action = {
         "id":          email["id"],
@@ -567,7 +678,7 @@ async def list_emails(limit: int = MAX_EMAIL_FETCH):
         enriched = []
         for em in emails:
             try:
-                em["project_suggestion"] = suggest_project_for_email(em)
+                em["project_suggestion"] = bandit_project_suggestion(em) or suggest_project_for_email(em)
             except Exception:
                 em["project_suggestion"] = None
             enriched.append(em)
@@ -609,6 +720,17 @@ async def manual_group_process(req: ClusterRequest):
         return {"error": "No matching emails found in current inbox batch. Fetch first."}
     
     title = req.title or "User Override Cluster"
+
+    # Ensure a project exists for this cluster title
+    project = None
+    try:
+        project = db_service.get_project_by_name(title)
+        if not project:
+            project = db_service.create_project(title, "Created from manual cluster override")
+    except Exception as e:
+        await broadcast({"type": "log", "level": "error", "msg": f"Project create/check failed: {e}"})
+        project = None
+
     email_blocks = []
     for idx, d in enumerate(selected_emails, 1):
         email_blocks.append(
@@ -634,11 +756,44 @@ async def manual_group_process(req: ClusterRequest):
         "body": composite_body,
         "attachments": [],
         "force_intent": "brd",
+        "project_id": project.get("id") if project else None,
     }
+
+    # Link original emails to the project if we created/found one
+    if project:
+        for em in selected_emails:
+            try:
+                db_service.link_email_to_project(em.get("id"), project.get("id"))
+            except Exception:
+                pass
     
     await broadcast({"type":"log", "level":"warn", "msg":f"USER OVERRIDE: Forcing LangGraph extraction on {len(selected_emails)} emails directly!"})
     asyncio.create_task(process_email(mock_cluster_email, thread_emails_override=selected_emails))
     return {"status": "processing", "message": "Manual override triggered directly to LangGraph"}
+
+
+# ══════════════════════════════════════════════════════════════
+# BANDIT
+# ══════════════════════════════════════════════════════════════
+class BanditFeedback(BaseModel):
+    project_id: str
+    reward: float = 1.0
+    email_id: str | None = None
+    event: str | None = "reward"
+
+
+@app.get("/api/bandit/state")
+async def bandit_state():
+    state = _bandit_state()
+    # Return a small tail of logs to avoid blowing up payloads
+    log_tail = state.get("log", [])[-50:]
+    return {"epsilon": state.get("epsilon", 0.2), "stats": state.get("stats", {}), "log": log_tail}
+
+
+@app.post("/api/bandit/feedback")
+async def bandit_feedback(payload: BanditFeedback):
+    st = bandit_reward(payload.project_id, payload.reward, email_id=payload.email_id, event=payload.event or "reward")
+    return {"project_id": payload.project_id, "stats": st}
 
 
 # ══════════════════════════════════════════════════════════════
@@ -927,7 +1082,7 @@ async def get_unassigned():
     # Enrich each email with an AI project suggestion for the UI dropdown
     for em in emails:
         try:
-            em["project_suggestion"] = suggest_project_for_email(em)
+            em["project_suggestion"] = bandit_project_suggestion(em) or suggest_project_for_email(em)
         except Exception:
             em["project_suggestion"] = None
     return {"emails": emails}
@@ -939,6 +1094,10 @@ async def assign_email(project_id: str, data: dict):
     email_id = data.get("email_id")
     if not email_id: return {"error":"Missing email_id"}
     db_service.link_email_to_project(email_id, project_id)
+    try:
+        bandit_reward(project_id, 1.0, email_id=email_id, event="assign")
+    except Exception:
+        pass
     await broadcast({"type":"log","level":"info","msg":f"Email linked to project {project_id}"})
     return {"status":"linked"}
 

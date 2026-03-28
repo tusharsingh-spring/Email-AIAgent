@@ -373,22 +373,28 @@ async def brd_writer_node(state: AgentState) -> AgentState:
     project_name = extracted.get("project_name", state.get("subject", "Project")).replace("BRD:", "").strip()
     ctx = json.dumps(extracted, indent=2)[:4000]
 
-    system = f"""You are a Lead Business Analyst. Produce a professional BRD ready for executives and engineers. Be concise, actionable, and avoid fluff. Use bullet lists and numbered items; no placeholders like TBD unless explicitly absent.
+    system = f"""You are a Lead Business Analyst + Solution Architect. Produce a board-ready BRD that is architectural, testable, and implementation-ready. Be concise, prefer bullets/numbered lists, and forbid placeholders like TBD unless the source explicitly lacks data.
+Emphasize:
+- Architecture POV: integration touchpoints, data contracts, sequencing/flows, and deployment/operability notes.
+- Requirements quality: actionable, testable, with acceptance signals; group by value/priority.
+- NFRs with hard numbers (latency, availability, RPO/RTO, privacy, security controls, scalability plan).
+- Risks/constraints with owners and mitigations.
+
 Return ONLY valid JSON with this EXACT structure:
 {{
     "title": "BRD: {project_name}",
     "version": "1.0",
     "status": "Draft",
     "sections": {{
-        "executive_summary": "2-4 bullet lines covering goal, users, value, and current pain",
-        "business_objectives": "SMART objectives with target metrics",
-        "scope": "Two subsections: In-Scope (bullets) and Out-of-Scope (bullets) plus key assumptions",
-        "functional_requirements": "Numbered FR list with ID, title, description, priority, and acceptance note",
-        "non_functional_requirements": "NFR list grouped by category (performance, security, availability, privacy, UX) with measurable thresholds",
-        "stakeholders_decisions": "Stakeholder roles + major decisions/approvals captured",
-        "risks_constraints": "Risk table style: risk, impact, mitigation, owners; include constraints/dependencies",
-        "feature_prioritization": "MoSCoW or P0/P1/P2 grouping with rationale",
-        "timeline_milestones": "Milestones with target dates or relative weeks; include next immediate step"
+        "executive_summary": "2-4 bullets: goal, primary users, value, pain removed, architectural headline (e.g., event-driven, API-first)",
+        "business_objectives": "SMART objectives with target metrics and success checkpoints",
+        "scope": "In-Scope / Out-of-Scope bullets and key assumptions; call out integrations and data domains in scope",
+        "functional_requirements": "Numbered FR list with ID, title, behavior, acceptance note, priority; include API/flow hooks where relevant",
+        "non_functional_requirements": "NFRs grouped by category (performance, security, availability, privacy, scalability, observability) with measurable thresholds",
+        "stakeholders_decisions": "Roles, RACI hints, and major decisions/approvals (architecture, vendors, data residency)",
+        "risks_constraints": "Risk table style: risk, impact, mitigation, owner; include technical constraints/dependencies",
+        "feature_prioritization": "MoSCoW or P0/P1/P2 grouping with rationale and sequencing hints",
+        "timeline_milestones": "Milestones with dates or relative weeks; include next step and architecture/infra checkpoints"
     }},
     "metadata": {{ "project_name": "{project_name}" }}
 }}"""
@@ -403,15 +409,15 @@ Return ONLY valid JSON with this EXACT structure:
 
     print(f"[LLM] Primary BRD call failed for {project_name}. Falling back to Section-by-Section generation...")
     sections_schema = {
-        "executive_summary": "Summarize the project vision and problem being solved",
-        "business_objectives": "List 3-5 specific business goals",
-        "scope": "Define what is in and out of scope",
-        "functional_requirements": "Detail the specific features and user stories",
-        "non_functional_requirements": "Specify performance, security, and quality needs",
-        "stakeholders_decisions": "Identify key people and technical decisions",
-        "risks_constraints": "List potential blockers and risks",
-        "feature_prioritization": "Rank features by business value",
-        "timeline_milestones": "Propose a high-level delivery schedule"
+        "executive_summary": "Summarize vision, primary users, value, and the architectural posture (API-first, event-driven, etc.)",
+        "business_objectives": "List 3-5 SMART objectives with metrics",
+        "scope": "In-scope vs out-of-scope bullets; note data domains and integrations in scope",
+        "functional_requirements": "Actionable features/user stories with IDs, acceptance notes, and any API/flow hooks",
+        "non_functional_requirements": "Measurable NFRs (performance, security, availability, privacy, scalability, observability) with thresholds",
+        "stakeholders_decisions": "Key roles, RACI hints, major architecture/vendor/data decisions",
+        "risks_constraints": "Blockers, constraints, dependencies with impact/mitigation/owner",
+        "feature_prioritization": "MoSCoW or P0/P1/P2 with rationale and sequencing",
+        "timeline_milestones": "Milestones/dates or relative weeks; include next step and architecture/infra checkpoints"
     }
     
     final_sections = {}

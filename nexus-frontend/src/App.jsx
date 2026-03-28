@@ -13,10 +13,16 @@ import Inbox from './pages/Inbox'
 import Metrics from './pages/Metrics'
 import BRDs from './pages/BRDs'
 import Escalations from './pages/Escalations'
+import Upload from './pages/Upload'
+import Calendar from './pages/Calendar'
+import ProjectMap from './pages/ProjectMap'
+import Assistant from './pages/Assistant'
+import Bandit from './pages/Bandit'
 
 import Sidebar from './components/Layout/Sidebar'
 import CommandPalette from './components/ui/CommandPalette'
 import DynamicIsland from './components/ui/DynamicIsland'
+import AssistantWidget from './components/ui/AssistantWidget'
 
 function IntroLoader() {
   const [stage, setStage] = useState(0)
@@ -141,6 +147,11 @@ function LayoutShell() {
               <Route path="/metrics" element={<Metrics />} />
               <Route path="/brds" element={<BRDs />} />
               <Route path="/escalations" element={<Escalations />} />
+              <Route path="/upload" element={<Upload />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/map" element={<ProjectMap />} />
+              <Route path="/assistant" element={<Assistant />} />
+              <Route path="/bandit" element={<Bandit />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
@@ -148,6 +159,7 @@ function LayoutShell() {
       </div>
 
       <CommandPalette />
+      <AssistantWidget />
       <ToastContainer />
     </>
   )

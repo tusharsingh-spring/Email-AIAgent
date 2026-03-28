@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
-import { listBrds, getBrdSections, downloadBrd } from '../services/api'
+import { listBrds, getBrdSections, getBrdResult, downloadBrd } from '../services/api'
 import { FileText, Download, Eye, Loader2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import BRDSectionContent from '../components/ui/BRDSectionContent'
 
@@ -25,6 +25,8 @@ function BRDCard({ jobId, brd }) {
   const [open, setOpen] = useState(false)
   const [sections, setSections] = useState(null)
   const [loadingSections, setLoadingSections] = useState(false)
+  const [meta, setMeta] = useState(null)
+  const [loadingMeta, setLoadingMeta] = useState(false)
 
   const toggle = async () => {
     if (open) { setOpen(false); return }
@@ -36,6 +38,12 @@ function BRDCard({ jobId, brd }) {
         setSections(d.sections || {})
       } catch { setSections({}) }
       setLoadingSections(false)
+    }
+    if (!meta) {
+      setLoadingMeta(true)
+      try { const r = await getBrdResult(jobId); setMeta(r || {}) }
+      catch { setMeta({}) }
+      setLoadingMeta(false)
     }
   }
 
@@ -60,6 +68,13 @@ function BRDCard({ jobId, brd }) {
             </span>
           </div>
           <div className="font-space text-[9px] text-brand-muted/30 mt-1 truncate">job: {jobId}</div>
+          {meta?.status && (
+            <div className="mt-2 flex items-center gap-2 font-space text-[9px] uppercase tracking-widest text-brand-muted">
+              <span className="px-2 py-0.5 rounded-sm border border-brand-border">Status</span>
+              <span style={{ color: '#00ff9d' }}>{meta.status}</span>
+              {meta.project_id && <span className="text-brand-muted/60">· Project {meta.project_id}</span>}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -95,8 +110,19 @@ function BRDCard({ jobId, brd }) {
                   <Loader2 size={14} className="animate-spin" />
                   <span className="font-space text-[10px] uppercase tracking-widest">Loading sections...</span>
                 </div>
+              ) : loadingMeta ? (
+                <div className="flex items-center gap-2 text-brand-muted/40">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span className="font-space text-[10px] uppercase tracking-widest">Loading details...</span>
+                </div>
               ) : sections && Object.entries(sections).length > 0 ? (
                 <div className="space-y-8 max-w-[720px]">
+                  {meta?.summary && (
+                    <div className="border border-brand-border rounded-sm p-4 bg-brand-input/20">
+                      <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted mb-2">LLM Summary</div>
+                      <div className="font-dm text-[13px] leading-[1.65] text-brand-muted">{meta.summary}</div>
+                    </div>
+                  )}
                   {Object.entries(sections).map(([key, value], i) => (
                     <div key={key}>
                       <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted/30 mb-1">

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { getActions, approveAction, rejectAction } from '../services/api'
-import { Activity, CheckCircle2, XCircle, Clock, Loader2, MailCheck } from 'lucide-react'
+import { Activity, CheckCircle2, XCircle, Clock, Loader2, MailCheck, AlertTriangle, Shield } from 'lucide-react'
 
 const FT = iso => {
   try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
@@ -22,7 +22,11 @@ const STATUS_META = {
   approved: { label: 'Sent', color: '#00ff9d', bg: 'rgba(0,255,157,0.08)' },
   rejected: { label: 'Rejected', color: '#ff5080', bg: 'rgba(255,80,80,0.08)' },
   escalated: { label: 'Escalated', color: '#ff5080', bg: 'rgba(255,80,80,0.08)' },
+  escalation: { label: 'Escalated', color: '#ff5080', bg: 'rgba(255,80,80,0.08)' },
+  pending_escalation: { label: 'Flagged (review)', color: '#FFE234', bg: 'rgba(255,226,52,0.12)' },
 }
+
+const ESCALATED_STATUSES = ['escalated', 'escalation']
 
 function ActionRow({ action, globalIdx, onUpdate }) {
   const { toast, dispatch } = useApp() || {}
@@ -33,9 +37,12 @@ function ActionRow({ action, globalIdx, onUpdate }) {
 
   const a = action
   const isSent = ['sent', 'approved'].includes(a.status)
-  const isEscalated = a.status === 'escalated'
+  const isEscalated = ESCALATED_STATUSES.includes(a.status)
+  const isFlagged = a.status === 'pending_escalation'
   const sm = STATUS_META[a.status] || STATUS_META.pending
   const intColor = INTENT_COLORS[a.intent] || 'rgba(255,255,255,0.3)'
+  const confidence = a.agent_state?.confidence ?? a.confidence
+  const escalationReason = a.agent_state?.escalation_reason || a.escalation_reason
 
   const handleApprove = async (e) => {
     e.stopPropagation()
@@ -95,11 +102,22 @@ function ActionRow({ action, globalIdx, onUpdate }) {
           >
             {sm.label}
           </span>
+          {typeof confidence === 'number' && (
+            <span className="font-space text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm border border-brand-border text-brand-muted flex items-center gap-1">
+              <Shield size={10} /> Conf {Math.round(confidence * 100)}%
+            </span>
+          )}
         </div>
 
         <div className="font-dm text-[12px] opacity-50 truncate mb-1">
           {a.email?.subject || '—'}
         </div>
+        {(isEscalated || isFlagged) && escalationReason && (
+          <div className="flex items-center gap-2 text-[11px] text-[#ff9fb6]">
+            <AlertTriangle size={12} />
+            <span>{escalationReason}</span>
+          </div>
+        )}
         {a.draft_body && (
           <p className="font-dm text-[12px] opacity-[0.38] line-clamp-2 leading-relaxed">
             {a.draft_body}
@@ -142,12 +160,16 @@ function ActionRow({ action, globalIdx, onUpdate }) {
                       </div>
                     </div>
                   )}
-                  {(isSent || isEscalated) && (
+                  {(isSent || isEscalated || isFlagged) && (
                     <div>
                       <div className="font-space text-[9px] tracking-[0.15em] opacity-30 uppercase mb-2">// Status</div>
                       <div className="font-dm text-[13px] leading-[1.65] opacity-60 bg-brand-input p-3 rounded-sm"
                         style={{ color: sm.color }}>
-                        {isEscalated ? '▲ This action was escalated to the human queue for manual review.' : '✓ Action has been sent.'}
+                        {isEscalated
+                          ? '▲ This action was escalated to the human queue for manual review.'
+                          : isFlagged
+                            ? '▲ Low confidence — flagged for manual review. Approve or reject below.'
+                            : '✓ Action has been sent.'}
                       </div>
                     </div>
                   )}
@@ -157,6 +179,21 @@ function ActionRow({ action, globalIdx, onUpdate }) {
                   <div className="mt-3 p-3 rounded-sm border border-[rgba(0,191,165,0.2)] bg-[rgba(0,191,165,0.04)] font-dm text-[12px]">
                     <span style={{ color: '#00bfa5' }}>📅 Meeting:</span>{' '}
                     <span className="opacity-60">{a.calendar_event.title} · {FT(a.calendar_event.start)}</span>
+                  </div>
+                )}
+
+                {(a.brd_job_id || a.brd_final) && (
+                  <div className="mt-3 p-3 rounded-sm border border-brand-border bg-brand-input/40 font-dm text-[12px] flex items-center gap-3 flex-wrap">
+                    <span className="font-space text-[9px] uppercase tracking-[0.15em] text-brand-yellow">BRD</span>
+                    <span className="opacity-70">{a.brd_final?.title || 'Ready to download'}</span>
+                    {a.brd_job_id && (
+                      <button
+                        onClick={() => window.open(`/api/brd/${a.brd_job_id}/download`, '_blank')}
+                        className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-3 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+                      >
+                        Download BRD
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -228,6 +265,8 @@ export default function Actions() {
     : filter === 'sent' ? actions.filter(a => ['sent', 'approved'].includes(a.status))
     : actions.filter(a => a.status === 'rejected')
 
+  const sorted = [...filtered].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+
   return (
     <div className="pb-20">
 
@@ -265,9 +304,9 @@ export default function Actions() {
       </div>
 
       {/* ACTION FEED */}
-      {filtered.length > 0 ? (
+      {sorted.length > 0 ? (
         <div className="process-wrap">
-          {filtered.map((a, i) => (
+          {sorted.map((a, i) => (
             <ActionRow
               key={a.id}
               action={a}

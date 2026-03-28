@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  getProjects, createProject, deleteProject, getProjectEmails, getProjectDocuments,
-  getProjectBRD, generateProjectBRD, uploadProjectDoc, attachEmail, getUnassignedEmails, downloadBrd
+  getProjects, getProject, deleteProject, getProjectEmails, getProjectDocuments, getProjectContext,
+  getProjectBRD, getProjectBRDStatus, generateProjectBRD, runProjectAgent, uploadProjectDoc,
+  assignEmail, getUnassignedEmails, downloadBrd
 } from '../services/api'
 import { FolderPlus, Plus, Download, FileText, Mail, Cpu, Loader2, Trash2 } from 'lucide-react'
 import PipelineGraph from '../components/ProjectStudio/PipelineGraph'
+import ContextSidebar from '../components/ProjectStudio/ContextSidebar'
 import BRDSectionContent from '../components/ui/BRDSectionContent'
 
 const LABELS = {
@@ -20,6 +22,9 @@ export default function Projects() {
   const [projects, setProjects] = useState([])
   const [active, setActive] = useState(null)
   const [context, setContext] = useState({ emails: [], documents: [] })
+  const [contextBlob, setContextBlob] = useState('')
+  const [projectDetails, setProjectDetails] = useState(null)
+  const [brdStatus, setBrdStatus] = useState(null)
   const [brdContent, setBrdContent] = useState(null)
   const [activeBrdId, setActiveBrdId] = useState(null)
   const [brdRunning, setBrdRunning] = useState({})
@@ -45,11 +50,21 @@ export default function Projects() {
   useEffect(() => { load() }, [])
 
   const selectProject = async (p) => {
-    setActive(p); setBrdContent(null); setActiveBrdId(null)
+    setActive(p); setBrdContent(null); setActiveBrdId(null); setProjectDetails(null); setBrdStatus(null); setContextBlob('')
     try {
       const [eRes, dRes] = await Promise.all([getProjectEmails(p.id), getProjectDocuments(p.id)])
       setContext({ emails: eRes.emails || [], documents: dRes.documents || [] })
     } catch { setContext({ emails: [], documents: [] }) }
+    try {
+      const [details, ctx, status] = await Promise.all([
+        getProject(p.id).catch(() => ({})),
+        getProjectContext(p.id).catch(() => ({})),
+        getProjectBRDStatus(p.id).catch(() => ({})),
+      ])
+      if (details?.project) setProjectDetails(details.project)
+      if (ctx?.context || ctx?.full_text) setContextBlob(ctx.context || ctx.full_text || '')
+      if (status) setBrdStatus(status)
+    } catch {}
     try {
       const b = await getProjectBRD(p.id)
       if (b.brd?.content?.sections) { setBrdContent(b.brd.content.sections); setActiveBrdId(b.brd.id || null) }
@@ -88,6 +103,20 @@ export default function Projects() {
     setBrdRunning(r => { const n = { ...r }; delete n[id]; return n })
   }
 
+  const handleRunAgent = async () => {
+    if (!active) return
+    try {
+      await runProjectAgent(active.id)
+      toast('Agent pipeline triggered', 'ok')
+    } catch { toast('Agent trigger failed', 'warn') }
+  }
+
+  const refreshBrdStatus = async () => {
+    if (!active) return
+    try { const s = await getProjectBRDStatus(active.id); setBrdStatus(s) }
+    catch { toast('Status check failed', 'warn') }
+  }
+
   const handleUploadDoc = async (e) => {
     const file = e.target.files[0]; if (!file || !active) return
     try { await uploadProjectDoc(active.id, file); toast('Document processed.', 'ok'); selectProject(active) }
@@ -114,7 +143,7 @@ export default function Projects() {
   const assignEmailToProject = async (emailId, emailSubject) => {
     if (!active) return
     try {
-      await attachEmail(active.id, emailId)
+      await assignEmail(active.id, emailId)
       toast(`Linked: ${emailSubject.slice(0, 30)}`, 'ok')
       setShowAssignModal(false); selectProject(active)
     } catch { toast('Link failed', 'warn') }
@@ -124,6 +153,17 @@ export default function Projects() {
   const isRunning = brdRunning[active?.id]
   const brdIsReady = !!brdContent
   const sectionEntries = brdContent ? Object.entries(brdContent) : []
+
+  const sidebarEmails = (context.emails || []).map(e => ({
+    ...e,
+    sender: e.from_name || e.from || e.sender || 'Unknown sender',
+  }))
+
+  const sidebarDocs = (context.documents || []).map(d => ({
+    ...d,
+    filename: d.filename || d.name || 'Document',
+    content: d.content || d.text || d.snippet || '',
+  }))
 
   return (
     <div className={`transition-opacity duration-700 pb-24 ${ready ? 'opacity-100' : 'opacity-0'}`}>
@@ -157,8 +197,8 @@ export default function Projects() {
             ) : projects.map(p => {
               const isAct = active?.id === p.id
               return (
-                <button key={p.id} onClick={() => selectProject(p)}
-                  className="w-full text-left px-3 py-2.5 rounded-sm border transition-all relative overflow-hidden"
+              <button key={p.id} onClick={() => selectProject(p)}
+                  className="w-full text-left px-3 py-2.5 rounded-sm border transition-all relative overflow-hidden shrink-0"
                   style={{
                     borderColor: isAct ? 'var(--color-brand-blue)' : 'rgba(255,255,255,0.07)',
                     background: isAct ? 'rgba(0,181,226,0.07)' : 'transparent',
@@ -167,11 +207,14 @@ export default function Projects() {
                     <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-brand-blue rounded-full"
                       style={{ boxShadow: '0 0 8px rgba(0,181,226,0.7)' }} />
                   )}
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full shrink-0 mt-1"
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0"
                       style={{ background: isAct ? 'var(--color-brand-blue)' : 'rgba(255,255,255,0.18)' }} />
-                    <span className="font-dm text-[12px] font-medium leading-snug"
-                      style={{ color: isAct ? '#fff' : 'rgba(255,255,255,0.42)' }}>
+                    <span
+                      className="font-dm text-[12px] font-medium truncate flex-1"
+                      style={{ color: isAct ? '#fff' : 'rgba(255,255,255,0.42)' }}
+                      title={p.name || 'Unnamed'}
+                    >
                       {p.name || 'Unnamed'}
                     </span>
                   </div>
@@ -241,6 +284,10 @@ export default function Projects() {
                     {isRunning ? <Loader2 size={10} className="animate-spin" /> : <Cpu size={10} />}
                     {isRunning ? 'Running…' : 'Generate BRD'}
                   </button>
+                  <button onClick={handleRunAgent}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 rounded-sm font-space text-[9px] uppercase tracking-widest transition-all">
+                    <Cpu size={10} /> Run Agent
+                  </button>
                   <button onClick={handleDeleteProject}
                     className="p-1.5 border border-transparent text-brand-muted hover:text-red-400 hover:border-red-400/20 rounded-sm transition-all">
                     <Trash2 size={13} />
@@ -248,72 +295,95 @@ export default function Projects() {
                 </div>
               </div>
 
-              {/* Context chips */}
-              {contextCount > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {context.emails.map(e => (
-                    <div key={e.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-brand-border font-dm text-[11px]"
-                      style={{ color: 'rgba(255,255,255,0.45)' }}>
-                      <Mail size={9} style={{ color: 'var(--color-brand-blue)', flexShrink: 0 }} />
-                      <span className="truncate max-w-[200px]">{e.subject || 'Email'}</span>
+              {/* Project meta & context */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="border border-brand-border rounded-sm p-4" style={{ background: '#050505' }}>
+                  <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted mb-2">Workspace Meta</div>
+                  <div className="font-bebas text-[20px] text-white leading-tight mb-1">
+                    {projectDetails?.name || active.name}
+                  </div>
+                  <div className="font-dm text-[13px] text-brand-muted leading-relaxed">
+                    {projectDetails?.description || 'No description provided.'}
+                  </div>
+                  {brdStatus && (
+                    <div className="mt-3 flex items-center gap-2 font-space text-[10px] uppercase tracking-widest">
+                      <span className="px-2 py-1 rounded-sm border border-brand-border text-brand-muted">BRD Status</span>
+                      <span style={{ color: '#00ff9d' }}>{brdStatus.status || brdStatus.message || 'unknown'}</span>
+                      <button onClick={refreshBrdStatus} className="text-brand-blue hover:underline text-[11px]">refresh</button>
                     </div>
-                  ))}
-                  {context.documents.map(d => (
-                    <div key={d.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-brand-border font-dm text-[11px]"
-                      style={{ color: 'rgba(255,255,255,0.45)' }}>
-                      <FileText size={9} style={{ color: 'var(--color-brand-yellow)', flexShrink: 0 }} />
-                      <span className="truncate max-w-[200px]">{d.name || 'Document'}</span>
-                    </div>
-                  ))}
+                  )}
                 </div>
-              )}
-
-              {/* Pipeline Graph */}
-              <div className="border border-brand-border rounded-sm overflow-hidden" style={{ background: '#050505' }}>
-                <PipelineGraph
-                  contextCount={contextCount}
-                  isRunning={isRunning}
-                  brdIsReady={brdIsReady}
-                  activeBrdId={activeBrdId}
-                  onDownload={downloadBrd}
-                  onRun={() => handleGenerateBRD(active.id)}
-                />
-              </div>
-
-              {/* BRD Article Viewer */}
-              {brdIsReady && (
-                <div className="border border-brand-border rounded-sm overflow-hidden" style={{ background: '#050505' }}>
-                  <div className="p-8 md:p-12">
-                    <div className="font-space text-[9px] uppercase tracking-[0.22em] mb-10"
-                      style={{ color: '#00ff9d', opacity: 0.7 }}>
-                      ✓ Generated Document
-                    </div>
-                    <article className="max-w-[720px] mx-auto">
-                      {sectionEntries.map(([k, v], idx) => (
-                        <section key={k} className="mb-12">
-                          <div className="snum" style={{ color: 'rgba(255,255,255,0.18)' }}>
-                            {String(idx + 1).padStart(2, '0')}
-                          </div>
-                          <h2 className="font-bebas text-[clamp(24px,2.8vw,32px)] leading-none tracking-[0.02em] uppercase mb-5 pb-3 border-b border-brand-border"
-                            style={{ color: 'var(--color-brand-yellow)' }}>
-                            {LABELS[k] || k}
-                          </h2>
-                          <BRDSectionContent sectionKey={k} value={v} />
-                        </section>
-                      ))}
-                    </article>
-                    {activeBrdId && (
-                      <div className="flex items-center gap-3 pt-6 mt-4 border-t border-brand-border">
-                        <span className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Export:</span>
-                        <button onClick={() => downloadBrd(activeBrdId, 'pdf')}
-                          className="flex items-center gap-1.5 px-4 py-2 border border-brand-border text-brand-muted hover:text-brand-blue hover:border-brand-blue/40 rounded-sm font-space text-[10px] uppercase tracking-widest transition-all">
-                          <Download size={12} /> PDF
-                        </button>
-                      </div>
-                    )}
+                <div className="border border-brand-border rounded-sm p-4" style={{ background: '#050505' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Context Preview</div>
+                    <div className="font-space text-[9px] text-brand-muted/60">{contextBlob ? `${contextBlob.length} chars` : 'Empty'}</div>
+                  </div>
+                  <div className="font-dm text-[13px] leading-relaxed text-brand-muted max-h-[140px] overflow-y-auto whitespace-pre-wrap">
+                    {contextBlob || 'No aggregated context yet.'}
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="flex flex-col xl:flex-row gap-5 items-start">
+                <div className="w-full xl:w-[320px] shrink-0">
+                  <ContextSidebar
+                    emails={sidebarEmails}
+                    documents={sidebarDocs}
+                    onUploadDoc={handleUploadDoc}
+                    onPasteText={() => setShowPasteModal(true)}
+                    onLinkEmail={openAssignModal}
+                  />
+                </div>
+
+                <div className="flex-1 flex flex-col gap-5 min-w-0">
+                  {/* Pipeline Graph */}
+                  <div className="border border-brand-border rounded-sm overflow-hidden" style={{ background: '#050505' }}>
+                    <PipelineGraph
+                      contextCount={contextCount}
+                      isRunning={isRunning}
+                      brdIsReady={brdIsReady}
+                      activeBrdId={activeBrdId}
+                      onDownload={downloadBrd}
+                      onRun={() => handleGenerateBRD(active.id)}
+                    />
+                  </div>
+
+                  {/* BRD Article Viewer */}
+                  {brdIsReady && (
+                    <div className="border border-brand-border rounded-sm overflow-hidden" style={{ background: '#050505' }}>
+                      <div className="p-8 md:p-12">
+                        <div className="font-space text-[9px] uppercase tracking-[0.22em] mb-10"
+                          style={{ color: '#00ff9d', opacity: 0.7 }}>
+                          ✓ Generated Document
+                        </div>
+                        <article className="max-w-[720px] mx-auto">
+                          {sectionEntries.map(([k, v], idx) => (
+                            <section key={k} className="mb-12">
+                              <div className="snum" style={{ color: 'rgba(255,255,255,0.18)' }}>
+                                {String(idx + 1).padStart(2, '0')}
+                              </div>
+                              <h2 className="font-bebas text-[clamp(24px,2.8vw,32px)] leading-none tracking-[0.02em] uppercase mb-5 pb-3 border-b border-brand-border"
+                                style={{ color: 'var(--color-brand-yellow)' }}>
+                                {LABELS[k] || k}
+                              </h2>
+                              <BRDSectionContent sectionKey={k} value={v} />
+                            </section>
+                          ))}
+                        </article>
+                        {activeBrdId && (
+                          <div className="flex items-center gap-3 pt-6 mt-4 border-t border-brand-border">
+                            <span className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Export:</span>
+                            <button onClick={() => downloadBrd(activeBrdId, 'pdf')}
+                              className="flex items-center gap-1.5 px-4 py-2 border border-brand-border text-brand-muted hover:text-brand-blue hover:border-brand-blue/40 rounded-sm font-space text-[10px] uppercase tracking-widest transition-all">
+                              <Download size={12} /> PDF
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

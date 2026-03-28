@@ -111,3 +111,12 @@ export const noiseScoreTool = () => req('/api/tools/noise-score', { method: 'POS
 export const ingestStatus = () => req('/api/ingest/status')
 export const scanIngest = () => req('/api/ingest/scan', { method: 'POST' })
 export const resetIngest = () => req('/api/ingest/reset', { method: 'POST' })
+
+// Bandit prototype
+export const getBanditState = () => req('/api/bandit/state')
+export const sendBanditFeedback = (project_id, reward = 1, email_id = null, event = 'reward') =>
+  req('/api/bandit/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_id, reward, email_id, event })
+  })
