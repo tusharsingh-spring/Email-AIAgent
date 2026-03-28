@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { useNavigate } from 'react-router-dom'
-import { Activity, MailQuestion, Calendar as CalIcon, ArrowRight, Layers, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import { getActionsBySections, getPendingClusters, approveAction, editDraft, rejectAction, getStats } from '../services/api'
+import { Activity, MailQuestion, Calendar as CalIcon, ArrowRight, Layers, Loader2, CheckCircle2, XCircle, Sparkles, Upload, FolderKanban, Inbox, Map } from 'lucide-react'
+import { getActionsBySections, getPendingClusters, approveAction, editDraft, rejectAction, getStats, getSummary, scanIngest, forceRecluster } from '../services/api'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -42,12 +42,15 @@ export default function Dashboard() {
   const [dismissing, setDismissing] = useState({})
   const [stats, setStats] = useState({})
   const [ready, setReady] = useState(false)
+  const [digest, setDigest] = useState('')
+  const [busy, setBusy] = useState({ ingest: false, recluster: false })
 
   useEffect(() => {
     setTimeout(() => setReady(true), 150)
     getActionsBySections().then(d => setSections(d || {})).catch(console.error)
     getPendingClusters().then(d => setClusters(d || [])).catch(console.error)
     getStats().then(d => setStats(d || {})).catch(() => {})
+    getSummary().then(d => setDigest(d?.summary || '')).catch(() => {})
   }, [])
 
   const allPending = Object.values(sections).filter(Array.isArray).flat()
@@ -103,6 +106,26 @@ export default function Dashboard() {
     ...(clusters.length > 0 ? [{ label: 'Clusters', value: clusters.length, icon: Layers, color: '#00ff9d', delay: 240 }] : []),
   ]
 
+  const quickLinks = [
+    { label: 'Inbox', path: '/inbox', icon: Inbox },
+    { label: 'Projects', path: '/projects', icon: FolderKanban },
+    { label: 'Upload Context', path: '/upload', icon: Upload },
+    { label: 'Project Map', path: '/map', icon: Map },
+    { label: 'Calendar', path: '/calendar', icon: CalIcon },
+  ]
+
+  const handleIngest = async () => {
+    setBusy(b => ({ ...b, ingest: true }))
+    try { await scanIngest(); toast('Manual ingest triggered', 'ok') } catch { toast('Ingest failed', 'err') }
+    setBusy(b => ({ ...b, ingest: false }))
+  }
+
+  const handleRecluster = async () => {
+    setBusy(b => ({ ...b, recluster: true }))
+    try { await forceRecluster(10); toast('Recluster started', 'ok') } catch { toast('Recluster failed', 'err') }
+    setBusy(b => ({ ...b, recluster: false }))
+  }
+
   return (
     <div className={`transition-opacity duration-700 ${ready ? 'opacity-100' : 'opacity-0'}`}>
 
@@ -122,6 +145,18 @@ export default function Dashboard() {
           }
         </p>
 
+        <div className="flex flex-wrap gap-2 mb-6">
+          {quickLinks.map(({ label, path, icon: Icon }) => (
+            <button
+              key={path}
+              onClick={() => navigate(path)}
+              className="flex items-center gap-2 px-3 py-2 rounded-sm border border-brand-border text-brand-muted hover:text-white hover:border-brand-blue/40 transition-colors font-space text-[10px] uppercase tracking-widest"
+            >
+              <Icon size={12} /> {label}
+            </button>
+          ))}
+        </div>
+
         {/* Stat tags with stagger */}
         <div className="flex flex-wrap gap-2.5">
           {statTags.map(({ label, value, icon: Icon, color, delay }) => (
@@ -139,6 +174,74 @@ export default function Dashboard() {
               {value} {label}
             </span>
           ))}
+        </div>
+      </div>
+
+      {/* OPERATIONS BAR */}
+      <div className="grid md:grid-cols-3 gap-4 mb-14">
+        <div className="p-4 rounded-sm border border-brand-border bg-brand-panel/70">
+          <div className="flex items-center gap-2 mb-2 text-brand-blue font-space text-[10px] uppercase tracking-widest">
+            <Sparkles size={14} /> AI Digest
+          </div>
+          <p className="text-[13px] leading-[1.6] text-brand-muted min-h-[56px]">
+            {digest || 'No summary yet — send a few emails to generate today’s digest.'}
+          </p>
+          <button
+            onClick={() => navigate('/actions')}
+            className="mt-3 text-brand-blue font-space text-[10px] uppercase tracking-widest hover:underline"
+          >
+            Review Actions →
+          </button>
+        </div>
+
+        <div className="p-4 rounded-sm border border-brand-border bg-brand-panel/70 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted">Pipelines</div>
+            <span className="text-[11px] text-brand-muted/70">Live</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleIngest}
+              disabled={busy.ingest}
+              className="flex-1 px-3 py-2 rounded-sm border border-brand-border text-brand-muted hover:text-white hover:border-brand-blue/40 transition-colors font-space text-[10px] uppercase tracking-widest disabled:opacity-60"
+            >
+              {busy.ingest ? <Loader2 size={12} className="animate-spin" /> : 'Ingest Now'}
+            </button>
+            <button
+              onClick={handleRecluster}
+              disabled={busy.recluster}
+              className="flex-1 px-3 py-2 rounded-sm border border-brand-border text-brand-muted hover:text-white hover:border-brand-blue/40 transition-colors font-space text-[10px] uppercase tracking-widest disabled:opacity-60"
+            >
+              {busy.recluster ? <Loader2 size={12} className="animate-spin" /> : 'Recluster'}
+            </button>
+          </div>
+          <div className="text-[12px] text-brand-muted">
+            Kick off ingestion or recluster queued emails if things look stale.
+          </div>
+        </div>
+
+        <div className="p-4 rounded-sm border border-brand-border bg-brand-panel/70">
+          <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted mb-2">Queue Snapshot</div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 rounded-sm border border-brand-border/50">
+              <div className="font-bebas text-3xl text-brand-text">{allPending.length}</div>
+              <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Pending</div>
+            </div>
+            <div className="p-2 rounded-sm border border-brand-border/50">
+              <div className="font-bebas text-3xl text-[#ff5080]">{escalations.length}</div>
+              <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Escalations</div>
+            </div>
+            <div className="p-2 rounded-sm border border-brand-border/50">
+              <div className="font-bebas text-3xl text-brand-blue">{clusters.length}</div>
+              <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Clusters</div>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/escalations')}
+            className="mt-3 text-brand-blue font-space text-[10px] uppercase tracking-widest hover:underline"
+          >
+            Open queues →
+          </button>
         </div>
       </div>
 

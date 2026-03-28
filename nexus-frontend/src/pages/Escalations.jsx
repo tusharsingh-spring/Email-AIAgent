@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { getActions } from '../services/api'
-import { AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ExternalLink, Shield, Sparkles } from 'lucide-react'
 
 const FT = iso => {
   try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
@@ -13,6 +13,8 @@ function EscalationRow({ action, idx, onResolve }) {
 
   const a = action
   const urgencyColor = a.urgency >= 80 ? '#ff5080' : a.urgency >= 50 ? '#FFE234' : '#00ff9d'
+  const confidence = a.agent_state?.confidence ?? a.confidence
+  const escalationReason = a.agent_state?.escalation_reason || a.escalation_reason
 
   return (
     <div
@@ -30,9 +32,21 @@ function EscalationRow({ action, idx, onResolve }) {
             Escalated
           </span>
           <span className="font-space text-[9px] text-brand-muted/40 ml-auto">{FT(a.created_at)}</span>
+          {typeof confidence === 'number' && (
+            <span className="font-space text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm border border-brand-border text-brand-muted flex items-center gap-1">
+              <Shield size={10} /> Conf {Math.round(confidence * 100)}%
+            </span>
+          )}
         </div>
 
         <div className="font-dm text-[12px] opacity-50 truncate mb-1">{a.email?.subject || '—'}</div>
+
+        {escalationReason && (
+          <div className="flex items-center gap-2 text-[11px] text-[#ff9fb6]">
+            <AlertTriangle size={12} />
+            <span>{escalationReason}</span>
+          </div>
+        )}
 
         {/* Urgency bar */}
         <div className="flex items-center gap-2 mt-2">
@@ -89,6 +103,11 @@ function EscalationRow({ action, idx, onResolve }) {
                   >
                     <CheckCircle2 size={12} /> Mark Resolved
                   </button>
+                  {escalationReason && (
+                    <div className="flex items-center gap-1 text-[11px] text-brand-muted/70">
+                      <Sparkles size={12} /> Explain: {escalationReason}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -65,6 +65,19 @@ function EmailRow({ email, isSelected, onSelect, onClick, isOpen, projects, onAs
           <div className="font-dm text-[12px] opacity-60 truncate mb-1">{email.subject || '—'}</div>
           <div className="font-dm text-[11px] opacity-30 line-clamp-1">{email.snippet || ''}</div>
 
+          {email.project_suggestion && (
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className="font-space text-[9px] uppercase tracking-widest text-brand-blue/80">AI Suggests</span>
+              <span className="font-space text-[10px] text-brand-blue">{email.project_suggestion.project_name}</span>
+              {email.project_suggestion.confidence !== undefined && (
+                <span className="font-space text-[9px] text-brand-muted/70">conf {email.project_suggestion.confidence}</span>
+              )}
+              {email.project_suggestion.reason && (
+                <span className="font-space text-[9px] text-brand-muted/60 line-clamp-1">{email.project_suggestion.reason}</span>
+              )}
+            </div>
+          )}
+
           {email.project_id && (
             <div className="mt-1 font-space text-[9px] text-[#00ff9d]">✓ Linked to project</div>
           )}
@@ -92,33 +105,40 @@ function EmailRow({ email, isSelected, onSelect, onClick, isOpen, projects, onAs
                 {email.body || email.snippet || '(empty)'}
               </div>
 
-              {/* Project assignment */}
-              {!email.project_id && (
-                <div className="flex items-center gap-2 flex-wrap mb-3">
-                  <select
-                    value={selProject}
-                    onChange={e => setSelProject(e.target.value)}
-                    className="bg-brand-input border border-brand-border text-brand-text font-space text-[10px] px-3 py-2 rounded-sm outline-none focus:border-brand-blue transition-colors"
-                    disabled={assigning}
-                  >
-                    <option value="">— Assign to project —</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                  {email.project_suggestion && (
-                    <span className="font-space text-[9px] text-brand-blue/60">
-                      AI suggests: {email.project_suggestion.project_name}
-                    </span>
-                  )}
-                  <button
-                    onClick={handleAssign}
-                    disabled={!selProject || assigning}
-                    className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-4 py-2 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-40"
-                  >
-                    {assigning ? <Loader2 size={10} className="animate-spin" /> : <Link size={10} />}
-                    Assign
-                  </button>
+              {/* Project suggestion + manual assignment */}
+              {email.project_suggestion && (
+                <div className="mb-3 border border-brand-border rounded-sm p-3 bg-brand-input/40">
+                  <div className="font-space text-[9px] uppercase tracking-widest text-brand-blue mb-1">AI Project Suggestion</div>
+                  <div className="font-dm text-[13px] text-brand-text">{email.project_suggestion.project_name}</div>
+                  <div className="font-space text-[10px] text-brand-muted/70 mt-1 flex flex-wrap gap-2">
+                    {email.project_suggestion.confidence !== undefined && <span>conf {email.project_suggestion.confidence}</span>}
+                    {email.project_suggestion.reason && <span className="opacity-70">{email.project_suggestion.reason}</span>}
+                  </div>
                 </div>
               )}
+
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                {email.project_id && (
+                  <span className="font-space text-[9px] text-brand-muted">Linked to project</span>
+                )}
+                <select
+                  value={selProject}
+                  onChange={e => setSelProject(e.target.value)}
+                  className="bg-brand-input border border-brand-border text-brand-text font-space text-[10px] px-3 py-2 rounded-sm outline-none focus:border-brand-blue transition-colors"
+                  disabled={assigning}
+                >
+                  <option value="">— Select project —</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <button
+                  onClick={handleAssign}
+                  disabled={!selProject || assigning}
+                  className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-4 py-2 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-40"
+                >
+                  {assigning ? <Loader2 size={10} className="animate-spin" /> : <Link size={10} />}
+                  {email.project_id ? 'Update Link' : 'Assign'}
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
