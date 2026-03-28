@@ -3,27 +3,30 @@ import { useApp } from '../context/AppContext'
 import { getActions, approveAction, rejectAction, generateBrdForAction } from '../services/api'
 import { Activity, CheckCircle2, XCircle, Clock, Loader2, MailCheck, AlertTriangle, Shield, FileText } from 'lucide-react'
 
+// Helper to format time cleanly
 const FT = iso => {
   try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
   catch { return iso || '' }
 }
 
-const INTENT_COLORS = {
-  brd: '#a855f7',
-  schedule: '#00B5E2',
-  escalate: '#ff5080',
-  general: 'rgba(255,255,255,0.3)',
-  status: '#FFE234',
+// Polished, muted accent colors instead of bright raw neons
+const INTENT_THEME = {
+  brd: { text: '#a78bfa', bg: 'rgba(167, 139, 250, 0.1)', border: 'rgba(167, 139, 250, 0.2)' },
+  schedule: { text: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)', border: 'rgba(56, 189, 248, 0.2)' },
+  escalate: { text: '#fb7185', bg: 'rgba(251, 113, 133, 0.1)', border: 'rgba(251, 113, 133, 0.2)' },
+  status: { text: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', border: 'rgba(251, 191, 36, 0.2)' },
+  general: { text: '#a1a1aa', bg: 'rgba(161, 161, 170, 0.1)', border: 'rgba(161, 161, 170, 0.2)' },
 }
 
+// Sophisticated status badges
 const STATUS_META = {
-  pending: { label: 'Pending', color: '#FFE234', bg: 'rgba(255,226,52,0.08)' },
-  sent: { label: 'Sent', color: '#00ff9d', bg: 'rgba(0,255,157,0.08)' },
-  approved: { label: 'Sent', color: '#00ff9d', bg: 'rgba(0,255,157,0.08)' },
-  rejected: { label: 'Rejected', color: '#ff5080', bg: 'rgba(255,80,80,0.08)' },
-  escalated: { label: 'Escalated', color: '#ff5080', bg: 'rgba(255,80,80,0.08)' },
-  escalation: { label: 'Escalated', color: '#ff5080', bg: 'rgba(255,80,80,0.08)' },
-  pending_escalation: { label: 'Flagged (review)', color: '#FFE234', bg: 'rgba(255,226,52,0.12)' },
+  pending: { label: 'Pending Review', text: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', border: 'rgba(251, 191, 36, 0.2)' },
+  sent: { label: 'Sent', text: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', border: 'rgba(52, 211, 153, 0.2)' },
+  approved: { label: 'Sent', text: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', border: 'rgba(52, 211, 153, 0.2)' },
+  rejected: { label: 'Rejected', text: '#f87171', bg: 'rgba(248, 113, 113, 0.1)', border: 'rgba(248, 113, 113, 0.2)' },
+  escalated: { label: 'Escalated', text: '#fb7185', bg: 'rgba(251, 113, 133, 0.1)', border: 'rgba(251, 113, 133, 0.2)' },
+  escalation: { label: 'Escalated', text: '#fb7185', bg: 'rgba(251, 113, 133, 0.1)', border: 'rgba(251, 113, 133, 0.2)' },
+  pending_escalation: { label: 'Flagged (Review)', text: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', border: 'rgba(251, 191, 36, 0.2)' },
 }
 
 const ESCALATED_STATUSES = ['escalated', 'escalation']
@@ -42,7 +45,7 @@ function ActionRow({ action, globalIdx, onUpdate }) {
   const canReview = ['pending', 'escalated', 'pending_escalation'].includes(a.status)
   const canGenerateBrd = (a.intent === 'brd' || a.email?.force_intent === 'brd' || a.force_brd) && !a.brd_final
   const sm = STATUS_META[a.status] || STATUS_META.pending
-  const intColor = INTENT_COLORS[a.intent] || 'rgba(255,255,255,0.3)'
+  const intTheme = INTENT_THEME[a.intent] || INTENT_THEME.general
   const confidence = a.agent_state?.confidence ?? a.confidence
   const escalationReason = a.agent_state?.escalation_reason || a.escalation_reason
 
@@ -89,7 +92,7 @@ function ActionRow({ action, globalIdx, onUpdate }) {
 
   return (
     <div
-      className={`process-row${isEscalated ? ' escalation-row' : ''}`}
+      className={`relative border-b border-white/10 group transition-colors duration-200 ${expanded ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'}`}
       style={{
         opacity: dismissing ? 0 : 1,
         transform: dismissing === 'approve' ? 'translateY(-10px)' : dismissing === 'reject' ? 'translateX(16px)' : 'none',
@@ -97,181 +100,218 @@ function ActionRow({ action, globalIdx, onUpdate }) {
       }}
       onClick={() => setExpanded(e => !e)}
     >
-      {/* Number */}
-      <div className={isEscalated ? 'escalation-n' : 'process-n'}>
-        {String(globalIdx + 1).padStart(2, '0')}
-      </div>
+      {/* Escalation Left-Border Indicator */}
+      {(isEscalated || isFlagged) && (
+        <div className={`absolute left-0 top-0 bottom-0 w-[2px] ${isEscalated ? 'bg-rose-500/50' : 'bg-amber-400/50'}`} />
+      )}
 
-      {/* Content */}
-      <div className="process-content">
-        <div className="flex items-center gap-3 mb-1 flex-wrap">
-          <span className="font-bebas text-[clamp(18px,2vw,24px)] text-brand-text leading-none">
-            {(a.email?.sender || 'Unknown').split('@')[0]}
-          </span>
-          <span
-            className="font-space text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm border"
-            style={{ color: intColor, borderColor: intColor, background: `${intColor}12` }}
-          >
-            {a.intent || 'general'}
-          </span>
-          <span
-            className="font-space text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm ml-auto"
-            style={{ color: sm.color, background: sm.bg }}
-          >
-            {sm.label}
-          </span>
-          {typeof confidence === 'number' && (
-            <span className="font-space text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm border border-brand-border text-brand-muted flex items-center gap-1">
-              <Shield size={10} /> Conf {Math.round(confidence * 100)}%
+      <div className="flex items-start gap-4 p-5 cursor-pointer">
+        {/* Clean Monospace Number */}
+        <div className="pt-1 w-6 shrink-0 font-mono text-xs text-zinc-500 font-medium">
+          {String(globalIdx + 1).padStart(2, '0')}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+            <span className="font-sans text-lg font-medium text-zinc-100 tracking-tight leading-none">
+              {(a.email?.sender || 'Unknown').split('@')[0]}
             </span>
-          )}
-        </div>
-
-        <div className="font-dm text-[12px] opacity-50 truncate mb-1">
-          {a.email?.subject || '—'}
-        </div>
-        {(isEscalated || isFlagged) && escalationReason && (
-          <div className="flex items-center gap-2 text-[11px] text-[#ff9fb6]">
-            <AlertTriangle size={12} />
-            <span>{escalationReason}</span>
-          </div>
-        )}
-        {a.draft_body && (
-          <p className="font-dm text-[12px] opacity-[0.38] line-clamp-2 leading-relaxed">
-            {a.draft_body}
-          </p>
-        )}
-        {!expanded && !isSent && a.draft_body && (
-          <div className="font-space text-[9px] text-brand-blue/60 mt-1 tracking-wide">
-            Click to review draft →
-          </div>
-        )}
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateRows: expanded ? '1fr' : '0fr',
-            transition: 'grid-template-rows 0.35s cubic-bezier(0.16,1,0.3,1)',
-          }}
-        >
-          <div style={{ overflow: 'hidden' }}>
-            {expanded && (
-              <div className="mt-4 pt-4 border-t border-brand-border" onClick={e => e.stopPropagation()}>
-                {/* 2-col: original | draft */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <div className="font-space text-[9px] tracking-[0.15em] opacity-30 uppercase mb-2">// Original Message</div>
-                    <div className="font-dm text-[13px] leading-[1.65] opacity-60 bg-brand-input p-3 rounded-sm max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-                      {a.email?.body || a.email?.snippet || '(no body)'}
-                    </div>
-                  </div>
-                  {a.draft_body && !isSent && canReview && (
-                    <div>
-                      <div className="font-space text-[9px] tracking-[0.15em] text-brand-blue uppercase mb-2">// AI Draft — click to edit</div>
-                      <div
-                        ref={draftRef}
-                        contentEditable={a.status === 'pending' ? 'true' : 'false'}
-                        suppressContentEditableWarning
-                        className="font-dm text-[13px] leading-[1.65] opacity-75 bg-brand-input p-3 rounded-sm outline-none focus:border focus:border-brand-blue/40"
-                      >
-                        {a.draft_body}
-                      </div>
-                    </div>
-                  )}
-                  {(isSent || isEscalated || isFlagged) && (
-                    <div>
-                      <div className="font-space text-[9px] tracking-[0.15em] opacity-30 uppercase mb-2">// Status</div>
-                      <div className="font-dm text-[13px] leading-[1.65] opacity-60 bg-brand-input p-3 rounded-sm"
-                        style={{ color: sm.color }}>
-                        {isEscalated
-                          ? '▲ This action was escalated to the human queue for manual review.'
-                          : isFlagged
-                            ? '▲ Low confidence — flagged for manual review. Approve or reject below.'
-                            : '✓ Action has been sent.'}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {a.calendar_event && (
-                  <div className="mt-3 p-3 rounded-sm border border-[rgba(0,191,165,0.2)] bg-[rgba(0,191,165,0.04)] font-dm text-[12px]">
-                    <span style={{ color: '#00bfa5' }}>📅 Meeting:</span>{' '}
-                    <span className="opacity-60">{a.calendar_event.title} · {FT(a.calendar_event.start)}</span>
-                  </div>
-                )}
-
-                {(a.brd_job_id || a.brd_final) && (
-                  <div className="mt-3 p-3 rounded-sm border border-brand-border bg-brand-input/40 font-dm text-[12px] flex items-center gap-3 flex-wrap">
-                    <span className="font-space text-[9px] uppercase tracking-[0.15em] text-brand-yellow">BRD</span>
-                    <span className="opacity-70">{a.brd_final?.title || 'Ready to download'}</span>
-                    {a.brd_job_id && (
-                      <button
-                        onClick={() => window.open(`/api/brd/${a.brd_job_id}/download`, '_blank')}
-                        className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-3 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
-                      >
-                        Download BRD
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {(canReview || canGenerateBrd) && (
-                  <div className="flex items-center gap-3 mt-4 flex-wrap">
-                    {canReview && (
-                      <button
-                        onClick={handleApprove}
-                        disabled={approving}
-                        className="flex items-center gap-2 bg-brand-blue text-brand-black px-5 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-60 hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        {approving ? <><Loader2 size={12} className="animate-spin" /> Sending...</> : <><MailCheck size={12} /> Approve & Send</>}
-                      </button>
-                    )}
-                    {canGenerateBrd && (
-                      <button
-                        onClick={handleGenerateBrd}
-                        disabled={approving}
-                        className="flex items-center gap-2 border border-brand-border text-brand-blue px-4 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest hover:border-brand-blue/60 transition-colors"
-                      >
-                        <FileText size={12} /> Generate BRD
-                      </button>
-                    )}
-                    {canReview && (
-                      <button
-                        onClick={handleReject}
-                        className="flex items-center gap-2 border border-[#ff5080]/40 text-[#ff5080] px-4 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest hover:bg-[#ff5080]/10 transition-colors"
-                      >
-                        <XCircle size={12} /> Reject
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {isEscalated && (
-                  <div className="flex items-center gap-3 mt-4">
-                    <a
-                      href="https://mail.google.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 bg-brand-blue text-brand-black px-5 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
-                    >
-                      Open in Gmail ↗
-                    </a>
-                  </div>
-                )}
-
-                <div className="font-space text-[9px] text-brand-muted/40 mt-3">
-                  {FT(a.created_at)} · urgency {a.urgency || 0}/100
-                </div>
-              </div>
+            
+            {/* Intent Pill */}
+            <span
+              className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border font-medium"
+              style={{ color: intTheme.text, backgroundColor: intTheme.bg, borderColor: intTheme.border }}
+            >
+              {a.intent || 'general'}
+            </span>
+            
+            {/* Status Pill */}
+            <span
+              className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border font-medium ml-auto"
+              style={{ color: sm.text, backgroundColor: sm.bg, borderColor: sm.border }}
+            >
+              {sm.label}
+            </span>
+            
+            {typeof confidence === 'number' && (
+              <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 text-zinc-400 flex items-center gap-1 font-medium bg-white/5">
+                <Shield size={10} /> {Math.round(confidence * 100)}%
+              </span>
             )}
           </div>
+
+          <div className="font-sans text-sm text-zinc-400 truncate mb-1">
+            {a.email?.subject || '—'}
+          </div>
+
+          {(isEscalated || isFlagged) && escalationReason && (
+            <div className="flex items-center gap-1.5 text-xs text-rose-400 mb-1 font-medium">
+              <AlertTriangle size={12} />
+              <span>{escalationReason}</span>
+            </div>
+          )}
+
+          {a.draft_body && !expanded && (
+            <p className="font-sans text-sm text-zinc-500 line-clamp-2 leading-relaxed mt-1">
+              {a.draft_body}
+            </p>
+          )}
+
+          {!expanded && !isSent && a.draft_body && (
+            <div className="font-mono text-[10px] text-blue-400 mt-2 uppercase tracking-wider font-medium opacity-80">
+              Click to review draft →
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded Section */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: expanded ? '1fr' : '0fr',
+          transition: 'grid-template-rows 0.35s cubic-bezier(0.16,1,0.3,1)',
+        }}
+      >
+        <div style={{ overflow: 'hidden' }}>
+          {expanded && (
+            <div className="pl-14 pr-5 pb-6" onClick={e => e.stopPropagation()}>
+              
+              <div className="grid md:grid-cols-2 gap-6 mt-2">
+                {/* Original Message */}
+                <div>
+                  <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2 font-medium">
+                    // Original Message
+                  </div>
+                  <div className="font-sans text-sm leading-relaxed text-zinc-400 bg-[#121214] border border-white/5 p-4 rounded-lg max-h-[250px] overflow-y-auto whitespace-pre-wrap shadow-inner">
+                    {a.email?.body || a.email?.snippet || '(no body)'}
+                  </div>
+                </div>
+
+                {/* AI Draft */}
+                {a.draft_body && !isSent && canReview && (
+                  <div>
+                    <div className="font-mono text-[10px] text-blue-400 uppercase tracking-widest mb-2 font-medium flex items-center justify-between">
+                      <span>// AI Draft</span>
+                      <span className="text-zinc-500 opacity-60">Editable</span>
+                    </div>
+                    <div
+                      ref={draftRef}
+                      contentEditable={a.status === 'pending' ? 'true' : 'false'}
+                      suppressContentEditableWarning
+                      className="font-sans text-sm leading-relaxed text-zinc-200 bg-[#121214] border border-white/10 p-4 rounded-lg outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all shadow-inner"
+                    >
+                      {a.draft_body}
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Read-only block */}
+                {(isSent || isEscalated || isFlagged) && (
+                  <div>
+                    <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2 font-medium">// Status</div>
+                    <div className="font-sans text-sm leading-relaxed bg-[#121214] border border-white/5 p-4 rounded-lg shadow-inner"
+                      style={{ color: sm.text }}>
+                      {isEscalated
+                        ? '▲ This action was escalated to the human queue for manual review.'
+                        : isFlagged
+                          ? '▲ Low confidence — flagged for manual review. Approve or reject below.'
+                          : '✓ Action has been sent successfully.'}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Integrations (Calendar / BRD) */}
+              {a.calendar_event && (
+                <div className="mt-4 p-3 rounded-lg border border-teal-500/20 bg-teal-500/5 font-sans text-sm flex items-center gap-2">
+                  <span className="text-teal-400">📅 Scheduled:</span>{' '}
+                  <span className="text-zinc-300 font-medium">{a.calendar_event.title}</span>
+                  <span className="text-zinc-500 text-xs ml-auto font-mono">{FT(a.calendar_event.start)}</span>
+                </div>
+              )}
+
+              {(a.brd_job_id || a.brd_final) && (
+                <div className="mt-4 p-3 rounded-lg border border-white/10 bg-white/5 font-sans text-sm flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-purple-400 border border-purple-400/20 bg-purple-400/10 px-2 py-0.5 rounded font-medium">BRD</span>
+                    <span className="text-zinc-300">{a.brd_final?.title || 'Document is ready to download'}</span>
+                  </div>
+                  {a.brd_job_id && (
+                    <button
+                      onClick={() => window.open(`/api/brd/${a.brd_job_id}/download`, '_blank')}
+                      className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-md font-mono text-[11px] uppercase tracking-wider font-medium transition-colors border border-white/10"
+                    >
+                      Download PDF
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {(canReview || canGenerateBrd) && (
+                <div className="flex items-center gap-3 mt-6 flex-wrap pt-4 border-t border-white/5">
+                  {canReview && (
+                    <button
+                      onClick={handleApprove}
+                      disabled={approving}
+                      className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-sans text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-60 shadow-sm"
+                    >
+                      {approving ? <><Loader2 size={16} className="animate-spin" /> Processing...</> : <><MailCheck size={16} /> Approve & Send</>}
+                    </button>
+                  )}
+                  {canGenerateBrd && (
+                    <button
+                      onClick={handleGenerateBrd}
+                      disabled={approving}
+                      className="flex items-center gap-2 border border-white/10 text-zinc-300 bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors"
+                    >
+                      <FileText size={16} className="text-purple-400" /> Generate BRD
+                    </button>
+                  )}
+                  {canReview && (
+                    <button
+                      onClick={handleReject}
+                      className="flex items-center gap-2 border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors ml-auto"
+                    >
+                      <XCircle size={16} /> Reject
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {isEscalated && (
+                <div className="flex items-center gap-3 mt-6 pt-4 border-t border-white/5">
+                  <a
+                    href="https://mail.google.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-5 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors border border-white/10 shadow-sm"
+                  >
+                    Open in Gmail ↗
+                  </a>
+                </div>
+              )}
+
+              <div className="font-mono text-[10px] text-zinc-600 mt-4 uppercase tracking-wider flex items-center justify-between">
+                <span>Created {FT(a.created_at)}</span>
+                <span>Priority Score: {a.urgency || 0}/100</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-const FILTERS = ['all', 'pending', 'sent', 'rejected']
+const FILTERS = [
+  { id: 'all', label: 'All Actions' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'sent', label: 'Sent' },
+  { id: 'rejected', label: 'Rejected' }
+]
 
 export default function Actions() {
   const { state, dispatch } = useApp() || {}
@@ -299,61 +339,74 @@ export default function Actions() {
   const sorted = [...filtered].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
 
   return (
-    <div className="pb-20">
+    <div className="min-h-screen pb-24 font-sans text-zinc-100 selection:bg-blue-500/30">
 
       {/* HEADER */}
-      <div className="mb-10">
-        <div className="htag mb-4">Activity / History</div>
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
-          <h1 className="font-bebas text-[clamp(38px,6.5vw,80px)] leading-[0.9] tracking-[0.01em] uppercase text-brand-text">
-            Agent Actions
-          </h1>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* filter pills */}
+      <div className="max-w-6xl mx-auto pt-12 px-6 lg:px-8 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-widest mb-2 font-medium">Activity / History</div>
+            <h1 className="font-sans text-4xl font-semibold tracking-tight text-white">
+              Agent Actions
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-3 flex-wrap bg-[#0a0a0a] p-1.5 rounded-lg border border-white/5">
+            {/* Filter Pills */}
             {FILTERS.map(f => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`font-space text-[10px] uppercase tracking-widest px-4 py-2 rounded-sm border transition-colors ${
-                  filter === f
-                    ? 'bg-brand-blue text-brand-black border-brand-blue'
-                    : 'border-brand-border text-brand-muted hover:text-white hover:border-white/20'
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`font-sans text-sm px-4 py-1.5 rounded-md transition-all font-medium ${
+                  filter === f.id
+                    ? 'bg-zinc-800 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
                 }`}
               >
-                {f}
+                {f.label}
               </button>
             ))}
+            
+            <div className="w-px h-6 bg-white/10 mx-1"></div>
+            
             <button
               onClick={load}
               disabled={loading}
-              className="ml-2 border border-brand-border text-brand-muted hover:text-white px-3 py-2 rounded-sm transition-colors"
+              className="px-3 py-1.5 text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
+              aria-label="Refresh Data"
             >
-              {loading ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Activity size={16} />}
             </button>
           </div>
         </div>
       </div>
 
       {/* ACTION FEED */}
-      {sorted.length > 0 ? (
-        <div className="process-wrap">
-          {sorted.map((a, i) => (
-            <ActionRow
-              key={a.id}
-              action={a}
-              globalIdx={i}
-              onUpdate={() => setRev(r => r + 1)}
-            />
-          ))}
+      <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <div className="bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+          {sorted.length > 0 ? (
+            <div className="flex flex-col">
+              {sorted.map((a, i) => (
+                <ActionRow
+                  key={a.id}
+                  action={a}
+                  globalIdx={i}
+                  onUpdate={() => setRev(r => r + 1)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 px-4 gap-4 bg-[#0a0a0a]">
+              <div className="p-4 rounded-full bg-white/5 border border-white/5">
+                <CheckCircle2 size={32} className="text-zinc-600" />
+              </div>
+              <div className="font-sans text-lg text-zinc-400 font-medium">
+                {loading ? 'Fetching actions...' : `No ${filter === 'all' ? '' : filter + ' '}actions found`}
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <CheckCircle2 size={48} style={{ color: 'rgba(255,255,255,0.1)' }} />
-          <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted/40">
-            {loading ? 'Loading actions...' : `No ${filter === 'all' ? '' : filter + ' '}actions found`}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }

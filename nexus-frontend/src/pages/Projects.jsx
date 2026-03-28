@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import {
   getProjects, getProject, deleteProject, getProjectEmails, getProjectDocuments, getProjectContext,
   getProjectBRD, getProjectBRDStatus, generateProjectBRD, runProjectAgent, uploadProjectDoc,
-  assignEmail, getUnassignedEmails, downloadBrd
+  assignEmail, getUnassignedEmails, downloadBrd, createProject
 } from '../services/api'
 import { FolderPlus, Plus, Download, FileText, Mail, Cpu, Loader2, Trash2 } from 'lucide-react'
 import PipelineGraph from '../components/ProjectStudio/PipelineGraph'
@@ -166,98 +166,102 @@ export default function Projects() {
   }))
 
   return (
-    <div className={`transition-opacity duration-700 pb-24 ${ready ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`min-h-screen font-sans text-zinc-100 transition-opacity duration-700 pb-24 selection:bg-blue-500/30 ${ready ? 'opacity-100' : 'opacity-0'}`}>
 
       {/* ── HEADER ── */}
-      <div className="mb-8 mt-6">
-        <div className="htag mb-3">Project Intelligence / Mission Control</div>
-        <h1 className="font-bebas text-[clamp(36px,5.5vw,72px)] leading-[0.9] tracking-[0.01em] uppercase">
-          Mission Control
+      <div className="max-w-[1400px] mx-auto pt-12 px-6 lg:px-8 mb-8">
+        <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-widest mb-2 font-medium">Project Intelligence</div>
+        <h1 className="font-sans text-4xl font-semibold tracking-tight text-white">
+          Project Studio
         </h1>
       </div>
 
       {/* ── TWO-COLUMN LAYOUT ── */}
-      <div className="flex flex-col md:flex-row gap-5 items-start">
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-8 flex flex-col md:flex-row gap-8 items-start">
 
         {/* LEFT — Vertical Project List */}
-        <div className="w-full md:w-[200px] md:shrink-0 md:sticky md:top-20">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-brand-border">
-            <span className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted">Workspaces</span>
-            <button onClick={() => setShowNewModal(true)}
-              className="flex items-center gap-1 font-space text-[9px] uppercase tracking-widest text-brand-blue hover:text-white transition-colors">
-              <Plus size={10} /> New
+        <div className="w-full md:w-[260px] md:shrink-0 md:sticky md:top-24">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+            <span className="font-mono text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Workspaces</span>
+            <button 
+              onClick={() => setShowNewModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-md transition-colors font-sans text-xs font-semibold"
+            >
+              <Plus size={14} /> New
             </button>
           </div>
 
-          <div className="flex flex-col gap-1 md:max-h-[calc(100vh-220px)] md:overflow-y-auto pr-1 max-h-[180px] overflow-y-auto">
+          <div className="flex flex-col gap-1.5 md:max-h-[calc(100vh-240px)] md:overflow-y-auto pr-2 max-h-[220px] overflow-y-auto no-scrollbar mask-edges-vertical">
             {projects.length === 0 ? (
-              <div className="text-brand-muted font-space text-[9px] py-6 text-center" style={{ opacity: 0.35 }}>
+              <div className="text-zinc-600 font-sans text-sm py-8 text-center font-medium">
                 No workspaces yet
               </div>
             ) : projects.map(p => {
               const isAct = active?.id === p.id
               return (
-              <button key={p.id} onClick={() => selectProject(p)}
-                  className="w-full text-left px-3 py-2.5 rounded-sm border transition-all relative overflow-hidden shrink-0"
-                  style={{
-                    borderColor: isAct ? 'var(--color-brand-blue)' : 'rgba(255,255,255,0.07)',
-                    background: isAct ? 'rgba(0,181,226,0.07)' : 'transparent',
-                  }}>
-                  {isAct && (
-                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-brand-blue rounded-full"
-                      style={{ boxShadow: '0 0 8px rgba(0,181,226,0.7)' }} />
-                  )}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ background: isAct ? 'var(--color-brand-blue)' : 'rgba(255,255,255,0.18)' }} />
-                    <span
-                      className="font-dm text-[12px] font-medium truncate flex-1"
-                      style={{ color: isAct ? '#fff' : 'rgba(255,255,255,0.42)' }}
-                      title={p.name || 'Unnamed'}
-                    >
-                      {p.name || 'Unnamed'}
-                    </span>
+              <button 
+                key={p.id} 
+                onClick={() => selectProject(p)}
+                className={`w-full text-left px-3.5 py-3 rounded-lg border transition-all relative overflow-hidden shrink-0 group ${
+                  isAct ? 'bg-blue-500/10 border-blue-500/30' : 'bg-[#121214] border-white/5 hover:border-white/10 hover:bg-white/[0.02]'
+                }`}
+              >
+                {isAct && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-lg" />
+                )}
+                <div className="flex items-center gap-3 min-w-0">
+                  <FolderPlus size={16} className={isAct ? 'text-blue-400' : 'text-zinc-500 group-hover:text-zinc-400'} />
+                  <span
+                    className={`font-sans text-sm font-medium truncate flex-1 ${isAct ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}
+                    title={p.name || 'Unnamed'}
+                  >
+                    {p.name || 'Unnamed'}
+                  </span>
+                </div>
+                {brdRunning[p.id] && (
+                  <div className="mt-2.5 w-full bg-white/5 rounded-full h-1 overflow-hidden">
+                    <div className="h-full bg-blue-500/50 w-1/2 rounded-full animate-progress" />
                   </div>
-                  {brdRunning[p.id] && (
-                    <div className="h-[2px] mt-2 w-full rounded-full"
-                      style={{ background: 'var(--color-brand-yellow)', animation: 'marquee 1.5s linear infinite' }} />
-                  )}
-                </button>
+                )}
+              </button>
               )
             })}
           </div>
         </div>
 
         {/* RIGHT — Workspace */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 w-full">
           {!active ? (
             /* Empty state */
-            <div className="flex flex-col items-center justify-center min-h-[480px] gap-4 border border-brand-border rounded-sm"
-              style={{ background: '#050505' }}>
-              <FolderPlus size={36} style={{ opacity: 0.1, color: 'var(--color-brand-blue)' }} />
-              <div className="font-space text-[10px] uppercase tracking-widest" style={{ opacity: 0.28 }}>
+            <div className="flex flex-col items-center justify-center min-h-[500px] gap-4 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-xl">
+              <div className="p-5 rounded-full bg-white/5 border border-white/5">
+                <FolderPlus size={40} className="text-zinc-600" />
+              </div>
+              <div className="font-sans text-lg font-medium text-zinc-400">
                 Select or create a workspace
               </div>
-              <button onClick={() => setShowNewModal(true)}
-                className="mt-1 flex items-center gap-2 border border-brand-blue/30 text-brand-blue px-5 py-2.5 rounded-sm font-space text-[10px] uppercase tracking-widest hover:bg-brand-blue hover:text-black transition-all">
-                <FolderPlus size={12} /> New Workspace
+              <button 
+                onClick={() => setShowNewModal(true)}
+                className="mt-2 flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-sans text-sm font-semibold hover:bg-blue-500 transition-colors shadow-sm"
+              >
+                <Plus size={16} /> New Workspace
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6">
 
-              {/* Project header bar */}
-              <div className="flex items-start justify-between gap-4 pb-5 border-b border-brand-border">
+              {/* Project Header Bar */}
+              <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 pb-6 border-b border-white/10">
                 <div className="min-w-0">
-                  <h2 className="font-bebas text-[clamp(22px,3vw,38px)] leading-none tracking-[0.02em] uppercase text-white truncate">
+                  <h2 className="font-sans text-3xl font-semibold text-white tracking-tight truncate mb-2">
                     {active.name}
                   </h2>
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="font-space text-[9px] uppercase tracking-[0.15em] text-brand-muted">
-                      {contextCount} context item{contextCount !== 1 ? 's' : ''}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-mono text-[11px] uppercase tracking-widest text-zinc-400 bg-[#121214] px-2 py-1 rounded border border-white/5 font-medium">
+                      {contextCount} Context Item{contextCount !== 1 ? 's' : ''}
                     </span>
                     {brdIsReady && (
-                      <span className="font-space text-[9px] uppercase tracking-[0.15em]" style={{ color: '#00ff9d' }}>
+                      <span className="font-mono text-[11px] uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 font-medium">
                         ✓ BRD Ready
                       </span>
                     )}
@@ -265,66 +269,97 @@ export default function Projects() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  <button onClick={openAssignModal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 rounded-sm font-space text-[9px] uppercase tracking-widest transition-all">
-                    <Mail size={10} /> Link
+                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                  <button 
+                    onClick={openAssignModal}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#121214] border border-white/10 text-zinc-300 hover:bg-white/5 hover:text-white rounded-lg font-sans text-sm font-medium transition-colors"
+                  >
+                    <Mail size={14} className="text-zinc-500" /> Link Email
                   </button>
-                  <button onClick={() => setShowPasteModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 rounded-sm font-space text-[9px] uppercase tracking-widest transition-all">
-                    <FileText size={10} /> Paste
+                  
+                  <div className="h-6 w-px bg-white/10 mx-1 hidden sm:block"></div>
+
+                  <button 
+                    onClick={() => setShowPasteModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#121214] border border-white/10 text-zinc-300 hover:bg-white/5 hover:text-white rounded-lg font-sans text-sm font-medium transition-colors"
+                  >
+                    <FileText size={14} className="text-zinc-500" /> Paste Text
                   </button>
-                  <label className="flex items-center gap-1.5 px-3 py-1.5 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 rounded-sm font-space text-[9px] uppercase tracking-widest transition-all cursor-pointer">
-                    <Download size={10} /> Upload
+                  <label className="flex items-center gap-1.5 px-3 py-2 bg-[#121214] border border-white/10 text-zinc-300 hover:bg-white/5 hover:text-white rounded-lg font-sans text-sm font-medium transition-colors cursor-pointer">
+                    <Download size={14} className="text-zinc-500" /> Upload Doc
                     <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleUploadDoc} className="hidden" />
                   </label>
-                  <button onClick={() => handleGenerateBRD(active.id)} disabled={!!isRunning}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold transition-all disabled:opacity-50"
-                    style={{ background: 'var(--color-brand-blue)', color: '#000' }}>
-                    {isRunning ? <Loader2 size={10} className="animate-spin" /> : <Cpu size={10} />}
-                    {isRunning ? 'Running…' : 'Generate BRD'}
+                  
+                  <div className="h-6 w-px bg-white/10 mx-1 hidden lg:block"></div>
+
+                  <button 
+                    onClick={() => handleGenerateBRD(active.id)} 
+                    disabled={!!isRunning}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-sans text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm"
+                  >
+                    {isRunning ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                    {isRunning ? 'Running Pipeline...' : 'Generate BRD'}
                   </button>
-                  <button onClick={handleRunAgent}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 rounded-sm font-space text-[9px] uppercase tracking-widest transition-all">
-                    <Cpu size={10} /> Run Agent
+                  <button 
+                    onClick={handleRunAgent}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-sans text-sm font-semibold transition-colors shadow-sm"
+                  >
+                    <Cpu size={16} /> Run Agent
                   </button>
-                  <button onClick={handleDeleteProject}
-                    className="p-1.5 border border-transparent text-brand-muted hover:text-red-400 hover:border-red-400/20 rounded-sm transition-all">
-                    <Trash2 size={13} />
+                  <button 
+                    onClick={handleDeleteProject}
+                    className="p-2 border border-transparent text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors ml-1"
+                    title="Delete Workspace"
+                  >
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
 
-              {/* Project meta & context */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="border border-brand-border rounded-sm p-4" style={{ background: '#050505' }}>
-                  <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted mb-2">Workspace Meta</div>
-                  <div className="font-bebas text-[20px] text-white leading-tight mb-1">
+              {/* Project Meta & Context Grid */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Meta Card */}
+                <div className="bg-[#121214] border border-white/5 rounded-xl p-6 shadow-inner flex flex-col">
+                  <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-4 font-medium">
+                    <FileText size={14} /> Workspace Meta
+                  </div>
+                  <h3 className="font-sans text-xl font-semibold text-white leading-tight mb-2">
                     {projectDetails?.name || active.name}
-                  </div>
-                  <div className="font-dm text-[13px] text-brand-muted leading-relaxed">
+                  </h3>
+                  <p className="font-sans text-sm text-zinc-400 leading-relaxed mb-4 flex-1">
                     {projectDetails?.description || 'No description provided.'}
-                  </div>
+                  </p>
                   {brdStatus && (
-                    <div className="mt-3 flex items-center gap-2 font-space text-[10px] uppercase tracking-widest">
-                      <span className="px-2 py-1 rounded-sm border border-brand-border text-brand-muted">BRD Status</span>
-                      <span style={{ color: '#00ff9d' }}>{brdStatus.status || brdStatus.message || 'unknown'}</span>
-                      <button onClick={refreshBrdStatus} className="text-brand-blue hover:underline text-[11px]">refresh</button>
+                    <div className="mt-auto pt-4 border-t border-white/5 flex items-center gap-3">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">BRD Status</span>
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-medium">
+                        {brdStatus.status || brdStatus.message || 'unknown'}
+                      </span>
+                      <button onClick={refreshBrdStatus} className="p-1 text-zinc-500 hover:text-white transition-colors ml-auto font-mono text-[10px] uppercase tracking-widest">
+                        Refresh
+                      </button>
                     </div>
                   )}
                 </div>
-                <div className="border border-brand-border rounded-sm p-4" style={{ background: '#050505' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Context Preview</div>
-                    <div className="font-space text-[9px] text-brand-muted/60">{contextBlob ? `${contextBlob.length} chars` : 'Empty'}</div>
+
+                {/* Context Card */}
+                <div className="bg-[#121214] border border-white/5 rounded-xl p-6 shadow-inner flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">
+                      <FileText size={14} /> Context Preview
+                    </div>
+                    <div className="font-mono text-[10px] text-zinc-500">{contextBlob ? `${contextBlob.length} chars` : 'Empty'}</div>
                   </div>
-                  <div className="font-dm text-[13px] leading-relaxed text-brand-muted max-h-[140px] overflow-y-auto whitespace-pre-wrap">
-                    {contextBlob || 'No aggregated context yet.'}
+                  <div className="flex-1 font-sans text-sm leading-relaxed text-zinc-400 max-h-[160px] overflow-y-auto whitespace-pre-wrap no-scrollbar mask-edges-vertical pr-2">
+                    {contextBlob || <span className="italic opacity-50">No aggregated context available. Upload documents or link emails to build context.</span>}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col xl:flex-row gap-5 items-start">
+              {/* Main Content Area */}
+              <div className="flex flex-col xl:flex-row gap-6 items-start mt-2">
+                
+                {/* Left Sidebar (Files/Emails) */}
                 <div className="w-full xl:w-[320px] shrink-0">
                   <ContextSidebar
                     emails={sidebarEmails}
@@ -335,9 +370,9 @@ export default function Projects() {
                   />
                 </div>
 
-                <div className="flex-1 flex flex-col gap-5 min-w-0">
-                  {/* Pipeline Graph */}
-                  <div className="border border-brand-border rounded-sm overflow-hidden" style={{ background: '#050505' }}>
+                <div className="flex-1 flex flex-col gap-6 min-w-0 w-full">
+                  {/* Pipeline Graph Area */}
+                  <div className="bg-[#121214] border border-white/5 rounded-xl overflow-hidden shadow-inner p-1">
                     <PipelineGraph
                       contextCount={contextCount}
                       isRunning={isRunning}
@@ -350,35 +385,39 @@ export default function Projects() {
 
                   {/* BRD Article Viewer */}
                   {brdIsReady && (
-                    <div className="border border-brand-border rounded-sm overflow-hidden" style={{ background: '#050505' }}>
-                      <div className="p-8 md:p-12">
-                        <div className="font-space text-[9px] uppercase tracking-[0.22em] mb-10"
-                          style={{ color: '#00ff9d', opacity: 0.7 }}>
-                          ✓ Generated Document
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xl text-gray-900">
+                      <div className="bg-gray-50 border-b border-gray-200 px-6 sm:px-12 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-xl bg-gray-50/80">
+                        <div className="font-mono text-[11px] uppercase tracking-widest text-purple-600 font-semibold flex items-center gap-2">
+                          <FileText size={16} /> Generated Requirements Document
                         </div>
-                        <article className="max-w-[720px] mx-auto">
+                        {activeBrdId && (
+                          <button 
+                            onClick={() => downloadBrd(activeBrdId, 'pdf')}
+                            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                          >
+                            <Download size={16} /> Export PDF
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="p-6 sm:p-12 pb-16">
+                        <article className="max-w-[760px] mx-auto space-y-12">
                           {sectionEntries.map(([k, v], idx) => (
-                            <section key={k} className="mb-12">
-                              <div className="snum" style={{ color: 'rgba(255,255,255,0.18)' }}>
-                                {String(idx + 1).padStart(2, '0')}
+                            <section key={k} className="scroll-mt-24">
+                              <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
+                                <span className="font-mono text-sm text-purple-600 font-bold bg-purple-100 px-2.5 py-1 rounded-md">
+                                  {String(idx + 1).padStart(2, '0')}
+                                </span>
+                                <h2 className="font-sans text-2xl font-bold text-gray-900 tracking-tight">
+                                  {LABELS[k] || k}
+                                </h2>
                               </div>
-                              <h2 className="font-bebas text-[clamp(24px,2.8vw,32px)] leading-none tracking-[0.02em] uppercase mb-5 pb-3 border-b border-brand-border"
-                                style={{ color: 'var(--color-brand-yellow)' }}>
-                                {LABELS[k] || k}
-                              </h2>
-                              <BRDSectionContent sectionKey={k} value={v} />
+                              <div className="prose prose-zinc prose-sm sm:prose-base max-w-none text-gray-700">
+                                <BRDSectionContent sectionKey={k} value={v} />
+                              </div>
                             </section>
                           ))}
                         </article>
-                        {activeBrdId && (
-                          <div className="flex items-center gap-3 pt-6 mt-4 border-t border-brand-border">
-                            <span className="font-space text-[9px] uppercase tracking-widest text-brand-muted">Export:</span>
-                            <button onClick={() => downloadBrd(activeBrdId, 'pdf')}
-                              className="flex items-center gap-1.5 px-4 py-2 border border-brand-border text-brand-muted hover:text-brand-blue hover:border-brand-blue/40 rounded-sm font-space text-[10px] uppercase tracking-widest transition-all">
-                              <Download size={12} /> PDF
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -389,90 +428,121 @@ export default function Projects() {
         </div>
       </div>
 
-      {/* ── MODAL: New Workspace ── */}
+      {/* ── MODALS ── */}
+      
+      {/* New Workspace Modal */}
       {showNewModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
           onClick={() => setShowNewModal(false)}>
-          <div className="bg-brand-panel border border-brand-border p-8 w-full max-w-md rounded-sm shadow-2xl"
+          <div className="bg-[#121214] border border-white/10 p-8 w-full max-w-md rounded-2xl shadow-2xl transform transition-all"
             onClick={e => e.stopPropagation()}>
-            <h3 className="font-bebas text-3xl mb-2 text-brand-text">New Workspace</h3>
-            <p className="text-[13px] text-brand-muted font-dm mb-6">Name your workspace to get started.</p>
-            <input ref={newNameRef} type="text" placeholder="e.g. ACME Platform Redesign"
-              value={newName} onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleNewProject(); if (e.key === 'Escape') setShowNewModal(false) }}
-              className="w-full bg-brand-input border border-brand-border text-brand-text p-3 mb-6 rounded-sm font-dm text-[14px] outline-none focus:border-brand-blue transition-colors" />
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-sans text-2xl font-semibold text-white tracking-tight">New Workspace</h3>
+              <button onClick={() => setShowNewModal(false)} className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 hover:text-white transition-colors p-1">Close</button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-6">Create a dedicated area for project files and context.</p>
+            
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="block font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium mb-2">Project Name</label>
+                <input ref={newNameRef} type="text" placeholder="e.g. Q3 Roadmap Planning"
+                  value={newName} onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleNewProject(); if (e.key === 'Escape') setShowNewModal(false) }}
+                  className="w-full bg-[#0a0a0a] border border-white/10 text-white p-3 rounded-lg font-sans text-sm outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all placeholder:text-zinc-600" />
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3">
-              <button className="px-5 py-2.5 font-space text-[10px] uppercase tracking-widest text-brand-muted hover:text-brand-text transition-colors"
+              <button className="px-5 py-2.5 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
                 onClick={() => setShowNewModal(false)}>Cancel</button>
               <button onClick={handleNewProject} disabled={!newName.trim()}
-                className="px-6 py-2.5 bg-brand-blue text-black font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-all rounded-sm disabled:opacity-40">
-                Create
+                className="px-6 py-2.5 bg-blue-600 text-white font-sans text-sm font-semibold hover:bg-blue-500 transition-all rounded-lg disabled:opacity-50 shadow-sm">
+                Create Project
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── MODAL: Paste Text ── */}
+      {/* Paste Modal */}
       {showPasteModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
           onClick={() => setShowPasteModal(false)}>
-          <div className="bg-brand-panel border border-brand-border p-8 w-full max-w-lg rounded-sm shadow-2xl"
+          <div className="bg-[#121214] border border-white/10 p-8 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
             onClick={e => e.stopPropagation()}>
-            <h3 className="font-bebas text-3xl mb-2 text-brand-text">Paste Raw Text</h3>
-            <p className="text-[13px] text-brand-muted font-dm mb-6">Meeting notes, transcripts, or any context.</p>
-            <input type="text" placeholder="Label (optional)"
-              value={pasteLabel} onChange={e => setPasteLabel(e.target.value)}
-              className="w-full bg-brand-input border border-brand-border text-brand-text p-3 mb-3 rounded-sm font-dm text-[14px] outline-none focus:border-brand-blue transition-colors" />
-            <textarea placeholder="Paste your content here..." rows={8}
-              value={pasteBody} onChange={e => setPasteBody(e.target.value)}
-              className="w-full bg-brand-input border border-brand-border text-brand-text p-3 mb-6 rounded-sm font-dm text-[14px] outline-none focus:border-brand-blue transition-colors resize-none" />
-            <div className="flex justify-end gap-3">
-              <button className="px-5 py-2.5 font-space text-[10px] uppercase tracking-widest text-brand-muted hover:text-brand-text transition-colors"
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-sans text-2xl font-semibold text-white tracking-tight">Paste Text Content</h3>
+              <button onClick={() => setShowPasteModal(false)} className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 hover:text-white transition-colors p-1">Close</button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-6">Quickly add meeting notes or text snippets to the project context.</p>
+            
+            <div className="flex-1 flex flex-col gap-4 min-h-0 mb-6">
+              <input type="text" placeholder="Document Label (e.g. Kickoff Call Notes)"
+                value={pasteLabel} onChange={e => setPasteLabel(e.target.value)}
+                className="w-full bg-[#0a0a0a] border border-white/10 text-white p-3 rounded-lg font-sans text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-600" />
+              <textarea placeholder="Paste your raw text here..."
+                value={pasteBody} onChange={e => setPasteBody(e.target.value)}
+                className="w-full flex-1 min-h-[200px] bg-[#0a0a0a] border border-white/10 text-white p-3 rounded-lg font-sans text-sm outline-none focus:border-blue-500/50 transition-all resize-none placeholder:text-zinc-600" />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/5 shrink-0">
+              <button className="px-5 py-2.5 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
                 onClick={() => setShowPasteModal(false)}>Cancel</button>
               <button onClick={handlePaste} disabled={!pasteBody.trim()}
-                className="px-6 py-2.5 bg-brand-blue text-black font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-all rounded-sm disabled:opacity-40">
-                Process
+                className="px-6 py-2.5 bg-blue-600 text-white font-sans text-sm font-semibold hover:bg-blue-500 transition-all rounded-lg disabled:opacity-50 shadow-sm">
+                Add to Context
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── MODAL: Link Email ── */}
+      {/* Link Email Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
           onClick={() => setShowAssignModal(false)}>
-          <div className="bg-brand-panel border border-brand-border p-8 w-full max-w-lg rounded-sm shadow-2xl max-h-[80vh] flex flex-col"
+          <div className="bg-[#121214] border border-white/10 p-8 w-full max-w-2xl rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
             onClick={e => e.stopPropagation()}>
-            <h3 className="font-bebas text-3xl mb-2 text-brand-text">Link Email Context</h3>
-            <p className="text-[13px] text-brand-muted font-dm mb-6">Select an email to attach as project context.</p>
-            <div className="flex-1 overflow-y-auto space-y-2">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-sans text-2xl font-semibold text-white tracking-tight">Link Email</h3>
+              <button onClick={() => setShowAssignModal(false)} className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 hover:text-white transition-colors p-1">Close</button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-6">Select an unassigned email thread to add to this project's context.</p>
+            
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2 no-scrollbar">
               {unassignedEmails.length === 0 ? (
-                <div className="text-center text-brand-muted font-space text-[11px] py-8">No unassigned emails</div>
+                <div className="text-center text-zinc-500 font-sans text-sm py-12 bg-[#0a0a0a] rounded-lg border border-white/5">
+                  No unassigned emails available in the inbox.
+                </div>
               ) : unassignedEmails.map(e => {
                 const name = e.from_name || e.from || '?'
                 const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-                const hue = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360
                 return (
-                  <button key={e.id} onClick={() => assignEmailToProject(e.id, e.subject || '')}
-                    className="w-full flex items-center gap-3 p-3 border border-brand-border hover:border-brand-blue/40 rounded-sm transition-all text-left group">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-dm font-bold text-[11px] text-white"
-                      style={{ background: `hsl(${hue},55%,32%)` }}>
+                  <button 
+                    key={e.id} 
+                    onClick={() => assignEmailToProject(e.id, e.subject || '')}
+                    className="w-full flex items-center gap-4 p-4 bg-[#0a0a0a] border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 rounded-xl transition-all text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-mono font-semibold text-[11px] text-zinc-300 bg-white/10 group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-colors">
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="font-dm text-[13px] font-medium text-brand-text truncate group-hover:text-brand-blue transition-colors">
+                      <div className="font-sans text-sm font-semibold text-white truncate mb-1">
                         {e.subject || 'No Subject'}
                       </div>
-                      <div className="font-dm text-[11px] text-brand-muted truncate">{e.from_name || e.from}</div>
+                      <div className="font-sans text-xs text-zinc-400 truncate">
+                        From: <span className="text-zinc-300">{e.from_name || e.from}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Plus size={20} />
                     </div>
                   </button>
                 )
               })}
             </div>
-            <div className="flex justify-end mt-6 pt-4 border-t border-brand-border">
-              <button className="px-5 py-2.5 font-space text-[10px] uppercase tracking-widest text-brand-muted hover:text-brand-text transition-colors"
+            <div className="flex justify-end mt-6 pt-5 border-t border-white/5 shrink-0">
+              <button className="px-6 py-2.5 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
                 onClick={() => setShowAssignModal(false)}>Close</button>
             </div>
           </div>

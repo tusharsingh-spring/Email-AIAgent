@@ -13,17 +13,10 @@ const initials = (sender = '') => {
   return name.slice(0, 2).toUpperCase() || 'EX'
 }
 
-const avatarColor = (sender = '') => {
-  let h = 0
-  for (let i = 0; i < sender.length; i++) h = (h * 31 + sender.charCodeAt(i)) % 360
-  return `hsl(${h},55%,45%)`
-}
-
 function EmailRow({ email, isSelected, onSelect, onClick, isOpen, projects, onAssign, onProcess }) {
   const [selProject, setSelProject] = useState(email.project_suggestion?.project_id || '')
   const [assigning, setAssigning] = useState(false)
 
-  const bg = avatarColor(email.sender || '')
   const ini = initials(email.sender)
 
   const handleAssign = async (e) => {
@@ -36,55 +29,48 @@ function EmailRow({ email, isSelected, onSelect, onClick, isOpen, projects, onAs
 
   return (
     <div
-      className="border-b border-brand-border last:border-0 cursor-pointer group transition-colors hover:bg-brand-hover"
-      style={{ background: isOpen ? 'rgba(255,255,255,0.03)' : undefined }}
+      className={`border-b border-white/5 last:border-0 cursor-pointer group transition-colors duration-200 ${isOpen ? 'bg-white/[0.02]' : 'hover:bg-white/[0.02]'}`}
       onClick={onClick}
     >
-      <div className="flex items-start gap-3 p-4">
-        {/* Checkbox */}
-        <div className="pt-0.5 shrink-0" onClick={e => { e.stopPropagation(); onSelect(email.id) }}>
-          <div className={`w-4 h-4 rounded-sm border transition-colors ${isSelected ? 'bg-brand-blue border-brand-blue' : 'border-brand-border hover:border-white/30'}`} />
+      <div className="flex items-start gap-4 p-5">
+        <div className="pt-1 shrink-0" onClick={e => { e.stopPropagation(); onSelect(email.id) }}>
+          <div className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-white/20 bg-transparent group-hover:border-white/40'}`}>
+            {isSelected && <CheckSquare size={12} className="text-white opacity-0" />}
+            {isSelected && (
+              <svg className="w-3 h-3 text-white absolute" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </div>
         </div>
 
-        {/* Avatar */}
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center font-space text-[10px] font-bold shrink-0"
-          style={{ background: bg, color: 'rgba(0,0,0,0.8)' }}
-        >
+        <div className="w-9 h-9 rounded-full flex items-center justify-center font-mono text-xs font-semibold shrink-0 bg-white/10 text-zinc-300">
           {ini}
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-0.5">
-            <span className="font-bebas text-[18px] text-brand-text leading-none truncate">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="font-sans text-lg font-medium text-zinc-100 truncate">
               {(email.sender || '').split('@')[0] || 'Unknown'}
             </span>
-            <span className="font-space text-[9px] text-brand-muted/40 shrink-0">{FT(email.received_at || email.date)}</span>
+            <span className="font-mono text-[11px] text-zinc-500 shrink-0">{FT(email.received_at || email.date)}</span>
           </div>
-          <div className="font-dm text-[12px] opacity-60 truncate mb-1">{email.subject || '—'}</div>
-          <div className="font-dm text-[11px] opacity-30 line-clamp-1">{email.snippet || ''}</div>
+          <div className="font-sans text-sm text-zinc-400 truncate mb-1">{email.subject || '—'}</div>
+          {!isOpen && <div className="font-sans text-sm text-zinc-600 line-clamp-1">{email.snippet || ''}</div>}
 
-          {email.project_suggestion && (
+          {!isOpen && email.project_suggestion && !email.project_id && (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className="font-space text-[9px] uppercase tracking-widest text-brand-blue/80">AI Suggests</span>
-              <span className="font-space text-[10px] text-brand-blue">{email.project_suggestion.project_name}</span>
-              {email.project_suggestion.confidence !== undefined && (
-                <span className="font-space text-[9px] text-brand-muted/70">conf {email.project_suggestion.confidence}</span>
-              )}
-              {email.project_suggestion.reason && (
-                <span className="font-space text-[9px] text-brand-muted/60 line-clamp-1">{email.project_suggestion.reason}</span>
-              )}
+              <span className="font-mono text-[10px] uppercase tracking-widest text-purple-400 border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 rounded font-medium">AI Suggestion</span>
+              <span className="font-sans text-sm text-zinc-300">{email.project_suggestion.project_name}</span>
             </div>
           )}
 
-          {email.project_id && (
-            <div className="mt-1 font-space text-[9px] text-[#00ff9d]">✓ Linked to project</div>
+          {!isOpen && email.project_id && (
+            <div className="mt-2 font-mono text-[10px] text-emerald-400 uppercase tracking-widest font-medium border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 rounded inline-block">✓ Linked</div>
           )}
         </div>
       </div>
 
-      {/* Expanded */}
       <div
         style={{
           display: 'grid',
@@ -94,60 +80,81 @@ function EmailRow({ email, isSelected, onSelect, onClick, isOpen, projects, onAs
       >
         <div style={{ overflow: 'hidden' }}>
           {isOpen && (
-            <div className="px-4 pb-5 pt-0" onClick={e => e.stopPropagation()}>
-              {/* Sender + date */}
-              <div className="font-space text-[9px] text-brand-muted/30 mb-3">
-                From: {email.sender} &nbsp;·&nbsp; {email.date || ''}
+            <div className="pl-[76px] pr-5 pb-6 pt-0" onClick={e => e.stopPropagation()}>
+              
+              <div className="font-mono text-[11px] text-zinc-500 mb-4 flex items-center gap-2">
+                <span>From:</span> <span className="text-zinc-300 font-sans text-sm">{email.sender}</span>
               </div>
 
-              {/* Body */}
-              <div className="font-dm text-[13px] leading-[1.65] opacity-60 bg-brand-input p-4 rounded-sm mb-4 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+              <div className="font-sans text-sm leading-relaxed text-zinc-400 bg-[#121214] border border-white/5 p-4 rounded-lg mb-6 max-h-[300px] overflow-y-auto whitespace-pre-wrap shadow-inner">
                 {email.body || email.snippet || '(empty)'}
               </div>
 
-              {/* Project suggestion + manual assignment */}
-              {email.project_suggestion && (
-                <div className="mb-3 border border-brand-border rounded-sm p-3 bg-brand-input/40">
-                  <div className="font-space text-[9px] uppercase tracking-widest text-brand-blue mb-1">AI Project Suggestion</div>
-                  <div className="font-dm text-[13px] text-brand-text">{email.project_suggestion.project_name}</div>
-                  <div className="font-space text-[10px] text-brand-muted/70 mt-1 flex flex-wrap gap-2">
-                    {email.project_suggestion.confidence !== undefined && <span>conf {email.project_suggestion.confidence}</span>}
-                    {email.project_suggestion.reason && <span className="opacity-70">{email.project_suggestion.reason}</span>}
+              {/* FIXED LAYOUT: Switched to robust flexbox instead of grid to prevent overlapping */}
+              <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+                
+                {/* Assignment Card */}
+                <div className="flex-1 bg-[#121214] border border-white/5 rounded-lg p-5 shadow-inner flex flex-col">
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-4 font-medium">Assignment</div>
+                  
+                  {email.project_suggestion && !email.project_id && (
+                    <div className="mb-4 bg-purple-500/5 border border-purple-500/20 rounded-md p-3">
+                      <div className="font-mono text-[10px] text-purple-400 uppercase tracking-widest mb-1 font-medium">AI Match</div>
+                      <div className="font-sans text-sm text-zinc-200">{email.project_suggestion.project_name}</div>
+                      {email.project_suggestion.reason && <div className="font-sans text-xs text-zinc-500 mt-1">{email.project_suggestion.reason}</div>}
+                    </div>
+                  )}
+
+                  <div className="mt-auto flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1 min-w-0 relative">
+                      <select
+                        value={selProject}
+                        onChange={e => setSelProject(e.target.value)}
+                        className="w-full bg-zinc-900 border border-white/10 text-zinc-300 font-sans text-sm pl-3 pr-8 py-2.5 rounded-md outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all appearance-none truncate"
+                        disabled={assigning}
+                      >
+                        <option value="">— Select project —</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                      {/* Custom caret for the select input */}
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={handleAssign}
+                      disabled={!selProject || assigning}
+                      className="shrink-0 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-md font-sans text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
+                    >
+                      {assigning ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
+                      {email.project_id ? 'Update' : 'Assign'}
+                    </button>
                   </div>
+                  
+                  {email.project_id && (
+                    <div className="mt-3 font-mono text-[11px] text-emerald-400">✓ Currently linked</div>
+                  )}
                 </div>
-              )}
 
-              <div className="flex items-center gap-2 flex-wrap mb-3">
-                {email.project_id && (
-                  <span className="font-space text-[9px] text-brand-muted">Linked to project</span>
-                )}
-                <select
-                  value={selProject}
-                  onChange={e => setSelProject(e.target.value)}
-                  className="bg-brand-input border border-brand-border text-brand-text font-space text-[10px] px-3 py-2 rounded-sm outline-none focus:border-brand-blue transition-colors"
-                  disabled={assigning}
-                >
-                  <option value="">— Select project —</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <button
-                  onClick={handleAssign}
-                  disabled={!selProject || assigning}
-                  className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-4 py-2 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-40"
-                >
-                  {assigning ? <Loader2 size={10} className="animate-spin" /> : <Link size={10} />}
-                  {email.project_id ? 'Update Link' : 'Assign'}
-                </button>
+                {/* Automation Card */}
+                <div className="lg:w-72 shrink-0 bg-[#121214] border border-white/5 rounded-lg p-5 shadow-inner flex flex-col">
+                   <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 mb-4 font-medium">Automation</div>
+                   <p className="font-sans text-sm text-zinc-500 mb-4 flex-1">
+                     Send this email through the agent pipeline to automatically extract tasks or draft replies.
+                   </p>
+                   <button
+                    onClick={() => onProcess(email.id)}
+                    className="w-full mt-auto flex justify-center items-center gap-2 border border-white/10 text-zinc-300 bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-md font-sans text-sm font-medium transition-colors"
+                  >
+                    <Cpu size={16} className="text-blue-400" /> Process via LangGraph
+                  </button>
+                </div>
+
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onProcess(email.id)}
-                  className="flex items-center gap-1.5 border border-brand-blue/40 text-brand-blue px-4 py-2 rounded-sm font-space text-[9px] uppercase tracking-widest hover:bg-brand-blue/10 transition-colors"
-                >
-                  <Cpu size={11} /> Process with LangGraph
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -231,138 +238,139 @@ export default function Inbox() {
   const hasSelected = selectedIds.size > 0
 
   return (
-    <div className="pb-20">
+    <div className="min-h-screen pb-24 font-sans text-zinc-100 selection:bg-blue-500/30">
 
-      {/* HEADER */}
-      <div className="mb-10">
-        <div className="htag mb-4">Communication / Gmail</div>
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
-          <h1 className="font-bebas text-[clamp(38px,6.5vw,80px)] leading-[0.9] tracking-[0.01em] uppercase text-brand-text">
-            Real Inbox
-          </h1>
+      <div className="max-w-6xl mx-auto pt-12 px-6 lg:px-8 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-widest mb-2 font-medium">Communication</div>
+            <h1 className="font-sans text-4xl font-semibold tracking-tight text-white flex items-center gap-3">
+              <InboxIcon className="text-zinc-500" size={32} /> Inbox
+            </h1>
+          </div>
+          
           <button
             onClick={loadEmails}
             disabled={loading}
-            className="flex items-center gap-2 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 px-5 py-2.5 rounded-sm font-space text-[10px] uppercase tracking-widest transition-colors hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg text-sm font-medium text-zinc-300 transition-colors disabled:opacity-50"
           >
-            {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {loading ? 'Fetching...' : 'Fetch Emails'}
           </button>
         </div>
       </div>
 
-      {/* EMAIL LIST */}
-      {emails.length > 0 ? (
-        <div className="bg-brand-panel border border-brand-border rounded-sm overflow-hidden">
-          {/* List header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border">
-            <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted/40">
+      <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <div className="bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+          <div className="bg-white/[0.02] border-b border-white/10 px-6 py-3 flex items-center justify-between min-h-[50px]">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 font-medium">
               {emails.length} messages
-            </div>
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="font-space text-[9px] text-brand-blue">{selectedIds.size} selected</span>
+            </span>
+            
+            {hasSelected && (
+              <div className="flex items-center gap-4 animate-in fade-in duration-200">
+                <span className="font-sans text-sm text-blue-400 font-medium">{selectedIds.size} selected</span>
                 <button
                   onClick={() => setClusterModal(true)}
-                  className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-3 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border border-white/10"
                 >
-                  <CheckSquare size={10} /> Cluster & BRD
+                  <CheckSquare size={14} /> Cluster Selected
                 </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
-                  className="text-brand-muted/40 hover:text-white transition-colors"
+                  className="text-zinc-500 hover:text-white transition-colors"
                 >
-                  <X size={13} />
+                  <X size={16} />
                 </button>
               </div>
             )}
           </div>
 
-          {emails.map(e => (
-            <EmailRow
-              key={e.id}
-              email={e}
-              isSelected={selectedIds.has(e.id)}
-              onSelect={toggleSelect}
-              onClick={() => setOpenId(openId === e.id ? null : e.id)}
-              isOpen={openId === e.id}
-              projects={projects}
-              onAssign={handleAssign}
-              onProcess={handleProcess}
-            />
-          ))}
+          {emails.length > 0 ? (
+            <div className="flex flex-col">
+              {emails.map(e => (
+                <EmailRow
+                  key={e.id}
+                  email={e}
+                  isSelected={selectedIds.has(e.id)}
+                  onSelect={toggleSelect}
+                  onClick={() => setOpenId(openId === e.id ? null : e.id)}
+                  isOpen={openId === e.id}
+                  projects={projects}
+                  onAssign={handleAssign}
+                  onProcess={handleProcess}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 gap-4">
+              <div className="p-4 rounded-full bg-white/5 border border-white/5">
+                <InboxIcon size={32} className="text-zinc-600" />
+              </div>
+              <div className="font-sans text-lg text-zinc-400 font-medium">
+                {loading ? 'Fetching emails...' : 'Inbox is empty'}
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <InboxIcon size={48} style={{ color: 'rgba(255,255,255,0.08)' }} />
-          <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted/40">
-            {loading ? 'Fetching emails from Gmail...' : 'Click "Fetch Emails" to load your real Gmail inbox'}
-          </div>
-        </div>
-      )}
-
-      {/* Floating selection bar */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: hasSelected ? '24px' : '-80px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          transition: 'bottom 0.35s cubic-bezier(0.16,1,0.3,1)',
-          zIndex: 8000,
-        }}
-        className="flex items-center gap-3 bg-[#111] border border-brand-border rounded-full px-5 py-3 shadow-2xl"
-      >
-        <span className="font-space text-[10px] text-brand-muted">{selectedIds.size} selected</span>
-        <button
-          onClick={() => setClusterModal(true)}
-          className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-4 py-1.5 rounded-full font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
-        >
-          <CheckSquare size={10} /> Cluster & BRD
-        </button>
-        <button
-          onClick={() => setSelectedIds(new Set())}
-          className="text-brand-muted/40 hover:text-white transition-colors"
-        >
-          <X size={13} />
-        </button>
       </div>
 
-      {/* Cluster Modal */}
+      <div
+        className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-out ${
+          hasSelected ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="flex items-center gap-4 bg-[#121214]/90 backdrop-blur-md border border-white/10 shadow-2xl rounded-full px-6 py-3">
+          <span className="font-sans text-sm font-medium text-zinc-200">{selectedIds.size} Selected</span>
+          <div className="w-px h-5 bg-white/10"></div>
+          <button
+            onClick={() => setClusterModal(true)}
+            className="flex items-center gap-2 bg-white text-black px-4 py-1.5 rounded-full font-sans text-sm font-semibold hover:bg-zinc-200 transition-colors"
+          >
+            <CheckSquare size={16} /> Create Cluster
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="p-1.5 text-zinc-500 hover:text-white transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
       {clusterModal && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm"
           onClick={() => setClusterModal(false)}
         >
           <div
-            className="bg-[#080808] border border-brand-border rounded-sm p-6 w-full max-w-[420px] mx-4"
+            className="bg-[#121214] border border-white/10 rounded-xl p-6 w-full max-w-md shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-blue mb-1">Manual Cluster</div>
-            <div className="font-bebas text-3xl text-brand-text mb-4">Name this Cluster</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-blue-400 mb-2 font-medium">Manual Action</div>
+            <h3 className="font-sans text-xl font-semibold text-white mb-6">Name this Cluster</h3>
             <input
               ref={clusterRef}
               type="text"
-              placeholder="e.g. Website Rewrite Sprint"
+              placeholder="e.g. Q3 Roadmap Review"
               value={clusterName}
               onChange={e => setClusterName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCluster(); if (e.key === 'Escape') setClusterModal(false) }}
-              className="w-full bg-brand-input border border-brand-border text-brand-text px-4 py-3 rounded-sm font-dm text-[14px] outline-none focus:border-brand-blue transition-colors mb-4"
+              className="w-full bg-[#0a0a0a] border border-white/10 text-white px-4 py-3 rounded-lg font-sans text-base outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all mb-6 placeholder:text-zinc-600"
             />
             <div className="flex items-center gap-3">
               <button
-                onClick={handleCluster}
-                disabled={!clusterName.trim()}
-                className="flex-1 bg-brand-blue text-brand-black py-2.5 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-40"
-              >
-                Cluster {selectedIds.size} Emails
-              </button>
-              <button
                 onClick={() => setClusterModal(false)}
-                className="px-4 py-2.5 border border-brand-border text-brand-muted hover:text-white rounded-sm font-space text-[10px] uppercase tracking-widest transition-colors"
+                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 rounded-lg font-sans text-sm font-medium transition-colors"
               >
                 Cancel
+              </button>
+              <button
+                onClick={handleCluster}
+                disabled={!clusterName.trim()}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-sans text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
+              >
+                Cluster {selectedIds.size} Items
               </button>
             </div>
           </div>

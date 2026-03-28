@@ -16,11 +16,6 @@ const LABELS = {
   timeline_milestones: 'Timeline & Milestones',
 }
 
-const FT = iso => {
-  try { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) }
-  catch { return iso || '' }
-}
-
 function BRDCard({ jobId, brd }) {
   const [open, setOpen] = useState(false)
   const [sections, setSections] = useState(null)
@@ -31,6 +26,7 @@ function BRDCard({ jobId, brd }) {
   const toggle = async () => {
     if (open) { setOpen(false); return }
     setOpen(true)
+    
     if (!sections) {
       setLoadingSections(true)
       try {
@@ -39,6 +35,7 @@ function BRDCard({ jobId, brd }) {
       } catch { setSections({}) }
       setLoadingSections(false)
     }
+    
     if (!meta) {
       setLoadingMeta(true)
       try { const r = await getBrdResult(jobId); setMeta(r || {}) }
@@ -48,95 +45,126 @@ function BRDCard({ jobId, brd }) {
   }
 
   return (
-    <div className="bg-brand-panel border border-brand-border rounded-sm overflow-hidden hover:border-white/10 transition-colors group">
-      {/* Card header */}
-      <div className="p-5 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-sm bg-[rgba(168,85,247,0.1)] border border-[rgba(168,85,247,0.2)] flex items-center justify-center text-[#a855f7] shrink-0">
-          <FileText size={18} />
+    <div className={`bg-[#121214] border border-white/10 rounded-xl overflow-hidden transition-all duration-300 ${open ? 'ring-1 ring-purple-500/30 shadow-lg' : 'hover:border-white/20 hover:shadow-md'}`}>
+      
+      {/* Card Header */}
+      <div 
+        className="p-5 flex items-start sm:items-center gap-4 cursor-pointer"
+        onClick={toggle}
+      >
+        <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 shadow-inner">
+          <FileText size={24} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bebas text-[clamp(18px,2vw,24px)] text-brand-text leading-tight mb-1">
+        
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <h3 className="font-sans text-lg font-semibold text-white truncate mb-1.5 leading-tight">
             {brd.title || 'Untitled BRD'}
-          </div>
+          </h3>
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-space text-[9px] text-brand-muted/40">{brd.sections_count || '?'} sections</span>
-            {brd.metadata?.total_fr && (
-              <span className="font-space text-[9px] text-brand-muted/40">{brd.metadata.total_fr} FRs · {brd.metadata.total_nfr || 0} NFRs</span>
-            )}
-            <span className="font-space text-[9px] text-[#a855f7]/60 bg-[rgba(168,85,247,0.06)] px-2 py-0.5 rounded-sm border border-[rgba(168,85,247,0.15)]">
-              Complete
+            <span className="font-mono text-[11px] text-zinc-400 font-medium">
+              ID: {jobId.slice(0, 8)}...
             </span>
+            <div className="w-1 h-1 rounded-full bg-white/20"></div>
+            <span className="font-mono text-[11px] text-zinc-400 font-medium">
+              {brd.sections_count || '?'} Sections
+            </span>
+            {brd.metadata?.total_fr && (
+              <>
+                <div className="w-1 h-1 rounded-full bg-white/20"></div>
+                <span className="font-mono text-[11px] text-zinc-400 font-medium">
+                  {brd.metadata.total_fr} FRs · {brd.metadata.total_nfr || 0} NFRs
+                </span>
+              </>
+            )}
+            
+            {meta?.status && (
+              <span className="ml-auto font-mono text-[10px] uppercase tracking-wider font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                {meta.status}
+              </span>
+            )}
           </div>
-          <div className="font-space text-[9px] text-brand-muted/30 mt-1 truncate">job: {jobId}</div>
-          {meta?.status && (
-            <div className="mt-2 flex items-center gap-2 font-space text-[9px] uppercase tracking-widest text-brand-muted">
-              <span className="px-2 py-0.5 rounded-sm border border-brand-border">Status</span>
-              <span style={{ color: '#00ff9d' }}>{meta.status}</span>
-              {meta.project_id && <span className="text-brand-muted/60">· Project {meta.project_id}</span>}
-            </div>
-          )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        <div className="flex items-center gap-2 shrink-0 mt-2 sm:mt-0">
           <button
             onClick={e => { e.stopPropagation(); downloadBrd(jobId) }}
-            className="flex items-center gap-1.5 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 px-3 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+            title="Download DOCX"
           >
-            <Download size={11} /> DOCX
+            <Download size={16} />
           </button>
           <button
-            onClick={toggle}
-            className="flex items-center gap-1.5 bg-brand-blue text-brand-black px-3 py-1.5 rounded-sm font-space text-[9px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white transition-colors border border-white/5"
           >
-            <Eye size={11} />
-            {open ? 'Hide' : 'View'}
-            {open ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
       </div>
 
-      {/* Expanded sections */}
+      {/* Expanded Content Area */}
       <div
         style={{
           display: 'grid',
           gridTemplateRows: open ? '1fr' : '0fr',
-          transition: 'grid-template-rows 0.4s cubic-bezier(0.16,1,0.3,1)',
+          transition: 'grid-template-rows 0.35s cubic-bezier(0.16,1,0.3,1)',
         }}
       >
         <div style={{ overflow: 'hidden' }}>
           {open && (
-            <div className="border-t border-brand-border px-5 py-6">
-              {loadingSections ? (
-                <div className="flex items-center gap-2 text-brand-muted/40">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="font-space text-[10px] uppercase tracking-widest">Loading sections...</span>
-                </div>
-              ) : loadingMeta ? (
-                <div className="flex items-center gap-2 text-brand-muted/40">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="font-space text-[10px] uppercase tracking-widest">Loading details...</span>
+            <div className="border-t border-white/5 bg-[#0a0a0a] px-6 py-6" onClick={e => e.stopPropagation()}>
+              
+              {loadingSections || loadingMeta ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-500">
+                  <Loader2 size={24} className="animate-spin text-zinc-400" />
+                  <span className="font-sans text-sm font-medium">Fetching BRD contents...</span>
                 </div>
               ) : sections && Object.entries(sections).length > 0 ? (
-                <div className="space-y-8 max-w-[720px]">
+                <div className="space-y-8">
+                  
+                  {/* Executive Summary / Meta block */}
                   {meta?.summary && (
-                    <div className="border border-brand-border rounded-sm p-4 bg-brand-input/20">
-                      <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted mb-2">LLM Summary</div>
-                      <div className="font-dm text-[13px] leading-[1.65] text-brand-muted">{meta.summary}</div>
+                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 shadow-inner">
+                      <div className="font-mono text-[11px] uppercase tracking-widest text-purple-400 font-semibold mb-2 flex items-center gap-2">
+                        <FileText size={14} /> AI Executive Summary
+                      </div>
+                      <p className="font-sans text-sm text-zinc-300 leading-relaxed">
+                        {meta.summary}
+                      </p>
                     </div>
                   )}
+
+                  {/* Standard Sections List */}
                   {Object.entries(sections).map(([key, value], i) => (
-                    <div key={key}>
-                      <div className="font-space text-[9px] uppercase tracking-[0.2em] text-brand-muted/30 mb-1">
-                        {String(i + 1).padStart(2, '0')}
+                    <div key={key} className="bg-[#121214] border border-white/5 rounded-xl overflow-hidden shadow-inner">
+                      <div className="bg-white/[0.02] border-b border-white/5 px-5 py-3 flex items-center gap-3">
+                        <span className="font-mono text-xs text-zinc-500 font-semibold bg-white/5 px-2 py-0.5 rounded">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <h4 className="font-sans text-base font-semibold text-zinc-100">
+                          {LABELS[key] || key}
+                        </h4>
                       </div>
-                      <h3 className="font-bebas text-[clamp(20px,2.5vw,28px)] text-brand-yellow border-b border-brand-border pb-3 mb-4">
-                        {LABELS[key] || key}
-                      </h3>
-                      <BRDSectionContent sectionKey={key} value={value} />
+                      <div className="p-5 font-sans text-sm text-zinc-400 leading-relaxed overflow-x-auto">
+                        <BRDSectionContent sectionKey={key} value={value} />
+                      </div>
                     </div>
                   ))}
+                  
+                  {/* Bottom Action Bar */}
+                  <div className="flex justify-end pt-4">
+                     <button
+                        onClick={() => downloadBrd(jobId)}
+                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-lg font-sans text-sm font-semibold transition-colors shadow-sm"
+                      >
+                        <Download size={16} /> Download Final Document (.docx)
+                      </button>
+                  </div>
                 </div>
               ) : (
-                <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted/40">No sections found</div>
+                <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-500 bg-[#121214] rounded-xl border border-white/5">
+                  <FileText size={24} className="text-zinc-600" />
+                  <span className="font-sans text-sm font-medium">No detailed sections available for this BRD.</span>
+                </div>
               )}
             </div>
           )}
@@ -168,41 +196,52 @@ export default function BRDs() {
   const brdEntries = Object.entries(state?.brds || {})
 
   return (
-    <div className="pb-20">
+    <div className="min-h-screen pb-24 font-sans text-zinc-100 selection:bg-purple-500/30">
 
       {/* HEADER */}
-      <div className="mb-10">
-        <div className="htag mb-4">Documents / Generated</div>
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
-          <h1 className="font-bebas text-[clamp(38px,6.5vw,80px)] leading-[0.9] tracking-[0.01em] uppercase text-brand-text">
-            BRD Archive
-          </h1>
+      <div className="max-w-6xl mx-auto pt-12 px-6 lg:px-8 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="font-mono text-[11px] text-zinc-500 uppercase tracking-widest mb-2 font-medium">Documents</div>
+            <h1 className="font-sans text-4xl font-semibold tracking-tight text-white flex items-center gap-3">
+              BRD Archive
+            </h1>
+            <p className="font-sans text-sm text-zinc-400 mt-2">
+              Review and export auto-generated Business Requirement Documents.
+            </p>
+          </div>
+          
           <button
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-2 border border-brand-border text-brand-muted hover:text-white hover:border-white/20 px-5 py-2.5 rounded-sm font-space text-[10px] uppercase tracking-widest transition-colors hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg text-sm font-medium text-zinc-300 transition-colors disabled:opacity-50"
           >
-            {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-            Refresh
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
       </div>
 
-      {/* BRD GRID */}
-      {brdEntries.length > 0 ? (
-        <div className="grid lg:grid-cols-2 gap-4">
-          {brdEntries.map(([jobId, brd]) => (
-            <BRDCard key={jobId} jobId={jobId} brd={brd} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <FileText size={48} style={{ color: 'rgba(168,85,247,0.15)' }} />
-          <div className="font-space text-[10px] uppercase tracking-widest text-brand-muted/40">
-            {loading ? 'Loading BRDs...' : 'No BRDs yet — send an email or upload a transcript to generate one'}
+      {/* BRD LIST */}
+      <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        {brdEntries.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            {brdEntries.map(([jobId, brd]) => (
+              <BRDCard key={jobId} jobId={jobId} brd={brd} />
+            ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-[#0a0a0a] border border-white/10 rounded-xl flex flex-col items-center justify-center py-32 gap-4 shadow-2xl">
+            <div className="p-4 rounded-full bg-white/5 border border-white/5">
+              <FileText size={32} className="text-zinc-600" />
+            </div>
+            <div className="font-sans text-lg text-zinc-400 font-medium text-center px-4">
+              {loading ? 'Loading Documents...' : 'No BRDs found. Process an email cluster to generate one.'}
+            </div>
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }

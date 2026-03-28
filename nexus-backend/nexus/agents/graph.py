@@ -281,8 +281,14 @@ def brd_extraction_node(state: AgentState) -> AgentState:
     if project_id:
         print(f"[Agent] Retrieving proper context for Project: {project_id}")
         all_content = db_service.get_project_context_string(project_id)
+        # Ensure the current email is also included in case it's not synced yet
+        subj = state.get("subject", "")
+        base_body = state.get("body", "")
+        all_content += f"\n\n--- LATEST EMAIL ---\nSubject: {subj}\n\n{base_body}"
     else:
-        all_content = state["body"]
+        subj = state.get("subject", "")
+        base_body = state.get("body", "")
+        all_content = f"Subject: {subj}\n\n{base_body}"
         for prev in state.get("all_thread_emails", [])[-5:]:
             all_content += f"\n\n---\nFrom: {prev.get('sender','')}\n{prev.get('body','')[:800]}"
 
@@ -296,32 +302,32 @@ def brd_extraction_node(state: AgentState) -> AgentState:
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
     cleaned_content = clean_noisy_content(all_content)
-    context_to_process = cleaned_content[:12000]
+    context_to_process = cleaned_content[:8000]
 
-    system = """You are a senior business analyst. Use ONLY facts in the provided text; do NOT invent, generalize, or guess.
-If a field is missing, leave it empty (empty string/list/null). Remove hedging (no "maybe", "likely").
-Prefer short bullet phrases. Keep IDs sequential (FR-001...).
-Return ONLY valid JSON:
+    system = """Synthesize multi-email context into a single canonical BRD dataset.
+Extract ALL business requirements, goals, constraints, and implicit technical needs.
+Extract information specifically from the provided emails. If a field isn't explicitly mentioned, infer it intelligently or leave it as an empty string/array, do NOT output 'Not specified' or 'N/A' randomly.
+Return ONLY valid JSON with this EXACT structure:
 {
-    "project_name": "concise project name inferred from themes and subjects (grounded)",
-    "project_description": "2-3 crisp sentences on goals, users, and outcome (only from text)",
-    "business_problem": "specific pain being solved (only if stated)",
-    "stakeholders": [{"name":"","role":"","needs":"(what they asked for)"}],
-    "business_objectives": [{"objective":"","metric":"","priority":"high|medium|low"}],
-    "scope_in": ["what is included"],
-    "scope_out": ["what is excluded"],
-    "functional_requirements": [{"id":"FR-001","title":"","description":"actionable user story style","priority":"high|medium|low","source":"email|thread|doc"}],
-    "non_functional_requirements": [{"id":"NFR-001","category":"performance|security|scalability|usability","requirement":"measurable SLO/SLA style","priority":"high|medium|low"}],
-    "constraints": ["explicit constraints or dependencies"],
-    "assumptions": ["assumptions that were stated or implied"],
-    "risks": [{"risk":"","impact":"high|medium|low","mitigation":""}],
-    "timeline": {"start":null,"end":null,"milestones":[{"name":"","date":""}]},
-    "success_metrics": ["measurable KPIs"],
-    "decisions_made": ["key decisions or approvals"],
-    "feature_priorities": [{"feature":"","priority":"P0|P1|P2","rationale":"why"}]
+  "project_name": "string (Identify project name or infer from subject)",
+  "project_description": "2-3 sentences max describing the core problem and solution",
+  "business_problem": "string (Why is this needed?)",
+  "stakeholders": [{"name":"string","role":"string","needs":"string"}],
+  "business_objectives": [{"objective":"string","metric":"string","priority":"high|medium|low"}],
+  "scope_in": ["string"],
+  "scope_out": ["string"],
+  "functional_requirements": [{"id":"FR-001","title":"string","description":"string","priority":"high|medium|low"}],
+  "non_functional_requirements": [{"id":"NFR-001","category":"performance|security|scalability|usability","requirement":"string"}],
+  "constraints": ["string"],
+  "assumptions": ["string"],
+  "risks": [{"risk":"string","impact":"high|medium|low","mitigation":"string"}],
+  "timeline": {"start":null,"end":null,"milestones":["string"]},
+  "success_metrics": ["string"],
+  "decisions_made": ["string"],
+  "feature_priorities": [{"feature":"string","priority":"P0|P1|P2","rationale":"string"}]
 }"""
 
-    result = _llm(system, f"Communications (chronological, cleaned):\n\n{context_to_process}")
+    result = _llm(system, f"Communications:\n\n{context_to_process}")
     if isinstance(result, dict) and result:
         state["brd_extracted"] = result
     else:
@@ -365,12 +371,8 @@ def brd_gap_node(state: AgentState) -> AgentState:
     return state
 
 async def _generate_brd_section(project_name: str, section_key: str, section_desc: str, extracted: dict) -> str:
-    system = (
-        f"You are a senior Business Analyst. Write the '{section_key}' section for '{project_name}'. "
-        f"{section_desc}. Use only grounded details from context; no placeholders or guesses. "
-        "Be concise, bullet where possible, and highlight any critical risks or decisions that affect this section."
-    )
-    user = f"Context: {json.dumps(extracted, indent=2)[:3200]}"
+    system = f"You are a Business Analyst. Write the '{section_key}' section for '{project_name}'. {section_desc}. Return ONLY the text content."
+    user = f"Context: {json.dumps(extracted, indent=2)[:3000]}"
     res = await asyncio.get_event_loop().run_in_executor(None, _llm, system, user)
     return str(res) if res else "Context unavailable for this section."
 
@@ -379,30 +381,25 @@ async def brd_writer_node(state: AgentState) -> AgentState:
     project_name = extracted.get("project_name", state.get("subject", "Project")).replace("BRD:", "").strip()
     ctx = json.dumps(extracted, indent=2)[:4000]
 
-    system = f"""You are a Lead Business Analyst + Solution Architect. Use ONLY facts from the extracted data; do NOT invent or add features not mentioned. If data is missing, say "Not specified" instead of guessing. Be concise, use bullets/numbered lists, no placeholders like TBD.
-Emphasize:
-- Architecture POV grounded in text: integrations, data contracts, sequencing/flows, deployment/operability notes mentioned.
-- Requirements quality: actionable and testable; include acceptance signal if stated; keep priorities from source.
-- NFRs with hard numbers only if provided; otherwise mark "Not specified".
-- Risks/constraints from source; do not create new ones.
-
-Return ONLY valid JSON with this EXACT structure:
-{ {
-    "title": "BRD: {project_name}",
-    "version": "1.0",
-    "status": "Draft",
-    "sections": {
-        "executive_summary": "2-4 bullets: goal, primary users, value, pain removed, architectural headline grounded in text",
-        "business_objectives": "SMART objectives with target metrics from text; if absent, say 'Not specified'",
-        "scope": "In-Scope / Out-of-Scope bullets and key assumptions (only if present); call out integrations/data domains mentioned",
-        "functional_requirements": "Numbered FR list with ID, title, behavior, acceptance note, priority; only items stated in source",
-        "non_functional_requirements": "NFRs grouped by category with measurable thresholds only if provided; else 'Not specified'",
-        "stakeholders_decisions": "Roles, RACI hints, decisions explicitly mentioned; no new roles",
-        "risks_constraints": "Risk table: risk, impact, mitigation, owner—all from source; otherwise 'Not specified'",
-        "feature_prioritization": "MoSCoW or P0/P1/P2 grouping only if priorities exist; else 'Not specified'",
-        "timeline_milestones": "Milestones/dates or relative timing if provided; else 'Not specified'"
-    },
-    "metadata": { "project_name": "{project_name}" }
+    system = f"""Produce a professional BRD ready for executives and engineers based on the Extracted Requirements.
+Title it 'BRD: {project_name}'.
+Return ONLY valid JSON with this EXACT structure mapping directly to markdown content:
+{{
+  "title": "BRD: {project_name}",
+  "version": "1.0",
+  "status": "Draft",
+  "sections": {{
+    "executive_summary": "High-level overview mapping problems to solutions...",
+    "business_objectives": "3-5 SMART goals...",
+    "scope": "In-Scope, Out-of-Scope, Assumptions...",
+    "functional_requirements": "Provide in a clear readable markdown table format",
+    "non_functional_requirements": "Performance, Security, Reliability...",
+    "stakeholders_decisions": "Stakeholders list...",
+    "risks_constraints": "Risk matrix...",
+    "feature_prioritization": "MoSCoW formats...",
+    "timeline_milestones": "Milestones..."
+  }},
+  "metadata": {{ "project_name": "{project_name}" }}
 }}"""
 
     loop = asyncio.get_event_loop()

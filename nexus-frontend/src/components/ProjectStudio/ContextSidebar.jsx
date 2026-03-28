@@ -1,66 +1,86 @@
-import { FileUp, FileText, Link as LinkIcon, Mail } from 'lucide-react'
+import { 
+  Inbox, 
+  Zap, 
+  FileText, 
+  Calendar, 
+  AlertTriangle, 
+  Map, 
+  Cpu, 
+  CloudUpload,
+  Terminal
+} from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom' // Assuming you're using React Router
 
-export default function ContextSidebar({ 
-  emails, 
-  documents, 
-  onUploadDoc, 
-  onPasteText, 
-  onLinkEmail 
-}) {
+const NAV_ITEMS = [
+  { label: 'Inbox', icon: Inbox, path: '/inbox', color: 'text-brand-blue' },
+  { label: 'Actions', icon: Zap, path: '/actions', color: 'text-brand-yellow' },
+  { label: 'BRDs', icon: FileText, path: '/brds', color: 'text-purple-400' },
+  { label: 'Calendar', icon: Calendar, path: '/calendar', color: 'text-teal-400' },
+  { label: 'Escalations', icon: AlertTriangle, path: '/escalations', color: 'text-red-500' },
+  { label: 'Project Map', icon: Map, path: '/map', color: 'text-brand-blue' },
+  { label: 'Project Studio', icon: Cpu, path: '/studio', color: 'text-brand-blue' },
+  { label: 'Upload Resources', icon: CloudUpload, path: '/upload', color: 'text-brand-muted' },
+]
+
+export default function MainSidebar() {
+  const location = useLocation()
+
   return (
-    <div className="h-full flex flex-col bg-brand-panel border-r border-brand-border w-[260px] shrink-0">
+    <div className="h-screen w-[240px] flex flex-col bg-[#050505] border-r border-brand-border shrink-0 sticky top-0">
       
-      {/* CONTROLS */}
-      <div className="p-6 border-b border-brand-border bg-brand-base/30">
-        <h4 className="font-space text-[10px] tracking-[0.2em] text-brand-muted uppercase mb-4">Ingestion Nodes</h4>
-        <div className="flex flex-col gap-2">
-          <label className="border border-brand-border bg-brand-input hover:border-brand-blue hover:text-brand-blue text-brand-text px-4 py-3 rounded-sm cursor-pointer transition-colors font-space text-[10px] uppercase tracking-widest flex items-center gap-3 w-full">
-             <FileUp size={14} className="opacity-50" /> Upload Document
-             <input type="file" className="hidden" onChange={onUploadDoc} />
-          </label>
-          <button onClick={onPasteText} className="border border-brand-border bg-brand-input hover:border-brand-yellow hover:text-brand-yellow text-brand-text px-4 py-3 rounded-sm transition-colors font-space text-[10px] uppercase tracking-widest flex items-center gap-3 w-full text-left">
-             <FileText size={14} className="opacity-50" /> Paste Raw Text
-          </button>
-          <button onClick={onLinkEmail} className="border border-brand-border bg-brand-input hover:border-white hover:text-white text-brand-text px-4 py-3 rounded-sm transition-colors font-space text-[10px] uppercase tracking-widest flex items-center gap-3 w-full text-left">
-             <LinkIcon size={14} className="opacity-50" /> Link Inbox Thread
-          </button>
+      {/* BRAND / LOGO AREA */}
+      <div className="p-6 mb-4">
+        <div className="flex items-center gap-3 mb-2">
+          <Terminal size={20} className="text-brand-blue" />
+          <span className="font-bebas text-2xl tracking-wider text-white">NEXUS AI</span>
+        </div>
+        <div className="font-space text-[9px] uppercase tracking-[0.3em] text-brand-muted">
+          Ops Management System
         </div>
       </div>
 
-      {/* LIST */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-        {emails.length === 0 && documents.length === 0 && (
-          <div className="text-center py-12 opacity-30 font-space text-[10px] uppercase tracking-widest">
-            Context Queue Empty
-          </div>
-        )}
+      {/* NAVIGATION LINKS */}
+      <nav className="flex-1 px-3 space-y-1">
+        {NAV_ITEMS.map((item) => {
+          const isActive = location.pathname === item.path
+          const Icon = item.icon
 
-        {/* Mapped Emails */}
-        {emails.map(e => (
-          <div key={e.id} className="p-4 bg-brand-input border border-brand-border rounded-sm hover:border-brand-blue/30 transition-colors">
-            <div className="flex items-start gap-3">
-              <div className="shrink-0 mt-0.5 text-brand-blue"><Mail size={14} /></div>
-              <div className="overflow-hidden">
-                <div className="font-bebas text-lg truncate leading-none mb-1 text-brand-text">{e.subject || 'No Subject'}</div>
-                <div className="font-space text-[9px] tracking-[0.1em] text-brand-muted uppercase truncate mb-2">{e.sender}</div>
-                <div className="font-dm text-[11px] text-brand-muted line-clamp-2 leading-relaxed opacity-70">{e.body}...</div>
-              </div>
-            </div>
-          </div>
-        ))}
+          return (
+            <Link
+              key={item.label}
+              to={item.path}
+              className={`
+                flex items-center gap-3 px-4 py-3 rounded-sm transition-all group
+                ${isActive 
+                  ? 'bg-brand-blue/10 border-l-2 border-brand-blue' 
+                  : 'hover:bg-white/5 border-l-2 border-transparent'
+                }
+              `}
+            >
+              <Icon 
+                size={18} 
+                className={`transition-colors ${isActive ? item.color : 'text-brand-muted group-hover:text-white'}`} 
+              />
+              <span className={`
+                font-space text-[11px] uppercase tracking-widest transition-colors
+                ${isActive ? 'text-white font-bold' : 'text-brand-muted group-hover:text-white'}
+              `}>
+                {item.label}
+              </span>
+            </Link>
+          )
+        })}
+      </nav>
 
-        {/* Mapped Docs */}
-        {documents.map(d => (
-          <div key={d.id} className="p-4 bg-brand-input border border-brand-border rounded-sm hover:border-brand-yellow/30 transition-colors">
-            <div className="flex items-start gap-3">
-              <div className="shrink-0 mt-0.5 text-brand-yellow"><FileText size={14} /></div>
-              <div className="overflow-hidden">
-                <div className="font-space text-[10px] tracking-[0.1em] text-brand-yellow uppercase break-all mb-2">{d.filename}</div>
-                <div className="font-dm text-[11px] text-brand-muted line-clamp-2 leading-relaxed opacity-70">{d.content}...</div>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* FOOTER / SYSTEM STATUS */}
+      <div className="p-6 border-t border-brand-border bg-[#0a0a0a]/50">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#00ff9d] animate-pulse" />
+          <span className="font-space text-[9px] uppercase tracking-widest text-brand-muted">System Live</span>
+        </div>
+        <div className="font-dm text-[10px] text-brand-muted opacity-50">
+          v2.4.0-stable
+        </div>
       </div>
     </div>
   )
