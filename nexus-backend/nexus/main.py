@@ -931,6 +931,17 @@ async def approve_action(action_id: str, body: dict = {}):
         asyncio.create_task(process_email(mock_email, thread_emails_override=thread_emails))
         return {"status": "processing_brd", "project_id": project_id}
         
+    # If escalated/pending and BRD intent lacks a BRD, trigger generation before sending
+    if action.get("intent") == "brd" and not action.get("brd_final"):
+        action["status"] = "processing_brd"
+        await broadcast({"type":"action_update", "id":action_id, "status":"processing_brd"})
+        try:
+            email = action.get("email", {})
+            asyncio.create_task(process_email(email))
+        except Exception as e:
+            await broadcast({"type":"log","level":"error","msg":f"BRD generation failed: {e}"})
+        return {"status":"processing_brd"}
+
     result = await _send_action_email(action, body or {})
     if result.get("error"):
         return result
@@ -938,6 +949,28 @@ async def approve_action(action_id: str, body: dict = {}):
     await broadcast({"type":"log","level":"ok",
         "msg":f"Real email sent to {email['sender']}"})
     return {"status":"sent"}
+
+
+@app.post("/api/actions/{action_id}/generate-brd")
+async def generate_brd_for_action(action_id: str):
+    """Force-run the BRD pipeline for an existing action."""
+    action = next((a for a in store.get("actions", []) if a.get("id") == action_id), None)
+    if not action:
+        return {"error": "Not found"}
+
+    email = action.get("email", {})
+    if not email:
+        return {"error": "No email on action"}
+
+    action["status"] = "processing_brd"
+    await broadcast({"type": "action_update", "id": action_id, "status": "processing_brd"})
+    try:
+        asyncio.create_task(process_email(email))
+        return {"status": "processing_brd"}
+    except Exception as e:
+        action["status"] = "pending"
+        await broadcast({"type": "action_update", "id": action_id, "status": "pending"})
+        return {"error": str(e)}
 
 @app.post("/api/actions/{action_id}/reject")
 async def reject_action(action_id: str):

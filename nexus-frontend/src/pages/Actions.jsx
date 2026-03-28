@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../context/AppContext'
-import { getActions, approveAction, rejectAction } from '../services/api'
-import { Activity, CheckCircle2, XCircle, Clock, Loader2, MailCheck, AlertTriangle, Shield } from 'lucide-react'
+import { getActions, approveAction, rejectAction, generateBrdForAction } from '../services/api'
+import { Activity, CheckCircle2, XCircle, Clock, Loader2, MailCheck, AlertTriangle, Shield, FileText } from 'lucide-react'
 
 const FT = iso => {
   try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
@@ -39,6 +39,8 @@ function ActionRow({ action, globalIdx, onUpdate }) {
   const isSent = ['sent', 'approved'].includes(a.status)
   const isEscalated = ESCALATED_STATUSES.includes(a.status)
   const isFlagged = a.status === 'pending_escalation'
+  const canReview = ['pending', 'escalated', 'pending_escalation'].includes(a.status)
+  const canGenerateBrd = (a.intent === 'brd' || a.email?.force_intent === 'brd' || a.force_brd) && !a.brd_final
   const sm = STATUS_META[a.status] || STATUS_META.pending
   const intColor = INTENT_COLORS[a.intent] || 'rgba(255,255,255,0.3)'
   const confidence = a.agent_state?.confidence ?? a.confidence
@@ -67,6 +69,22 @@ function ActionRow({ action, globalIdx, onUpdate }) {
       setDismissing('reject')
       setTimeout(() => onUpdate?.(), 320)
     } catch {}
+  }
+
+  const handleGenerateBrd = async (e) => {
+    e.stopPropagation()
+    setApproving(true)
+    try {
+      const r = await generateBrdForAction(a.id)
+      if (r.error) { toast?.(r.error, 'warn'); setApproving(false); return }
+      toast?.('BRD generation started', 'ok')
+      setDismissing('approve')
+      setTimeout(() => onUpdate?.(), 320)
+    } catch {
+      toast?.('Failed to start BRD', 'warn')
+    } finally {
+      setApproving(false)
+    }
   }
 
   return (
@@ -147,7 +165,7 @@ function ActionRow({ action, globalIdx, onUpdate }) {
                       {a.email?.body || a.email?.snippet || '(no body)'}
                     </div>
                   </div>
-                  {a.draft_body && !isSent && !isEscalated && (
+                  {a.draft_body && !isSent && canReview && (
                     <div>
                       <div className="font-space text-[9px] tracking-[0.15em] text-brand-blue uppercase mb-2">// AI Draft — click to edit</div>
                       <div
@@ -197,21 +215,34 @@ function ActionRow({ action, globalIdx, onUpdate }) {
                   </div>
                 )}
 
-                {a.status === 'pending' && (
-                  <div className="flex items-center gap-3 mt-4">
-                    <button
-                      onClick={handleApprove}
-                      disabled={approving}
-                      className="flex items-center gap-2 bg-brand-blue text-brand-black px-5 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-60 hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      {approving ? <><Loader2 size={12} className="animate-spin" /> Sending...</> : <><MailCheck size={12} /> Approve & Send</>}
-                    </button>
-                    <button
-                      onClick={handleReject}
-                      className="flex items-center gap-2 border border-[#ff5080]/40 text-[#ff5080] px-4 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest hover:bg-[#ff5080]/10 transition-colors"
-                    >
-                      <XCircle size={12} /> Reject
-                    </button>
+                {(canReview || canGenerateBrd) && (
+                  <div className="flex items-center gap-3 mt-4 flex-wrap">
+                    {canReview && (
+                      <button
+                        onClick={handleApprove}
+                        disabled={approving}
+                        className="flex items-center gap-2 bg-brand-blue text-brand-black px-5 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-60 hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        {approving ? <><Loader2 size={12} className="animate-spin" /> Sending...</> : <><MailCheck size={12} /> Approve & Send</>}
+                      </button>
+                    )}
+                    {canGenerateBrd && (
+                      <button
+                        onClick={handleGenerateBrd}
+                        disabled={approving}
+                        className="flex items-center gap-2 border border-brand-border text-brand-blue px-4 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest hover:border-brand-blue/60 transition-colors"
+                      >
+                        <FileText size={12} /> Generate BRD
+                      </button>
+                    )}
+                    {canReview && (
+                      <button
+                        onClick={handleReject}
+                        className="flex items-center gap-2 border border-[#ff5080]/40 text-[#ff5080] px-4 py-2 rounded-sm font-space text-[10px] uppercase tracking-widest hover:bg-[#ff5080]/10 transition-colors"
+                      >
+                        <XCircle size={12} /> Reject
+                      </button>
+                    )}
                   </div>
                 )}
 

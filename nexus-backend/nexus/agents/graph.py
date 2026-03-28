@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-ESCALATION_THRESHOLD = int(os.getenv("ESCALATION_THRESHOLD", "70"))
+ESCALATION_THRESHOLD = int(os.getenv("ESCALATION_THRESHOLD", "95"))
 LOCAL_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "brd_t5_finetuned")
 USE_LOCAL = os.getenv("LOCAL_BRD_MODEL", "false").lower() in ("1", "true", "yes") and os.path.isdir(LOCAL_MODEL_DIR)
 _groq_client = None
@@ -248,9 +248,10 @@ def intent_router_node(state: AgentState) -> AgentState:
         state["proposed_slots"]= result.get("proposed_slots", [])
         state["meeting_title"] = result.get("meeting_title") or state["subject"]
         is_explicit_escalation = (state["intent"] == "escalate")
+        is_brd_intent = (state["intent"] == "brd")
         has_urgent_sentiment = state["sentiment"] in ("frustrated", "urgent")
         state["needs_human"] = is_explicit_escalation or (
-            state["urgency_score"] >= ESCALATION_THRESHOLD and has_urgent_sentiment
+            not is_brd_intent and state["urgency_score"] >= ESCALATION_THRESHOLD and has_urgent_sentiment
         )
     else:
         intent, urgency, sentiment, is_business, category, reason = _heuristic_intent(
@@ -267,7 +268,10 @@ def intent_router_node(state: AgentState) -> AgentState:
         state["participants"] = [state.get("sender", "")]
         state["proposed_slots"] = []
         state["meeting_title"] = state.get("subject", "Meeting")
-        state["needs_human"] = urgency >= ESCALATION_THRESHOLD and sentiment in ("frustrated", "urgent")
+        is_brd_intent = intent == "brd"
+        state["needs_human"] = (
+            not is_brd_intent and urgency >= ESCALATION_THRESHOLD and sentiment in ("frustrated", "urgent")
+        )
 
     return state
 
@@ -294,13 +298,15 @@ def brd_extraction_node(state: AgentState) -> AgentState:
     cleaned_content = clean_noisy_content(all_content)
     context_to_process = cleaned_content[:12000]
 
-    system = """You are a senior business analyst. Synthesize multi-email context into a single canonical BRD dataset.
-Return ONLY valid JSON with grounded, non-hedged content (no "maybe", no placeholders). If data is missing, use an empty list/field instead of guessing. Deduplicate near-duplicates and keep IDs sequential.
+    system = """You are a senior business analyst. Use ONLY facts in the provided text; do NOT invent, generalize, or guess.
+If a field is missing, leave it empty (empty string/list/null). Remove hedging (no "maybe", "likely").
+Prefer short bullet phrases. Keep IDs sequential (FR-001...).
+Return ONLY valid JSON:
 {
-    "project_name": "concise project name inferred from themes and subjects",
-    "project_description": "2-3 crisp sentences on goals, users, and outcome",
-    "business_problem": "specific pain being solved",
-    "stakeholders": [{"name":"","role":"","needs":""}],
+    "project_name": "concise project name inferred from themes and subjects (grounded)",
+    "project_description": "2-3 crisp sentences on goals, users, and outcome (only from text)",
+    "business_problem": "specific pain being solved (only if stated)",
+    "stakeholders": [{"name":"","role":"","needs":"(what they asked for)"}],
     "business_objectives": [{"objective":"","metric":"","priority":"high|medium|low"}],
     "scope_in": ["what is included"],
     "scope_out": ["what is excluded"],
@@ -354,8 +360,8 @@ def brd_gap_node(state: AgentState) -> AgentState:
     result = _llm(system, f"Extracted data:\n{json.dumps(state.get('brd_extracted',{}), indent=2)[:3000]}")
     if isinstance(result, dict):
         state["brd_gaps"] = result
-        if not result.get("can_proceed", True):
-            state["needs_human"] = True
+        # Disable gap-driven escalations entirely
+        state["needs_human"] = False
     return state
 
 async def _generate_brd_section(project_name: str, section_key: str, section_desc: str, extracted: dict) -> str:
@@ -373,30 +379,30 @@ async def brd_writer_node(state: AgentState) -> AgentState:
     project_name = extracted.get("project_name", state.get("subject", "Project")).replace("BRD:", "").strip()
     ctx = json.dumps(extracted, indent=2)[:4000]
 
-    system = f"""You are a Lead Business Analyst + Solution Architect. Produce a board-ready BRD that is architectural, testable, and implementation-ready. Be concise, prefer bullets/numbered lists, and forbid placeholders like TBD unless the source explicitly lacks data.
+    system = f"""You are a Lead Business Analyst + Solution Architect. Use ONLY facts from the extracted data; do NOT invent or add features not mentioned. If data is missing, say "Not specified" instead of guessing. Be concise, use bullets/numbered lists, no placeholders like TBD.
 Emphasize:
-- Architecture POV: integration touchpoints, data contracts, sequencing/flows, and deployment/operability notes.
-- Requirements quality: actionable, testable, with acceptance signals; group by value/priority.
-- NFRs with hard numbers (latency, availability, RPO/RTO, privacy, security controls, scalability plan).
-- Risks/constraints with owners and mitigations.
+- Architecture POV grounded in text: integrations, data contracts, sequencing/flows, deployment/operability notes mentioned.
+- Requirements quality: actionable and testable; include acceptance signal if stated; keep priorities from source.
+- NFRs with hard numbers only if provided; otherwise mark "Not specified".
+- Risks/constraints from source; do not create new ones.
 
 Return ONLY valid JSON with this EXACT structure:
-{{
+{ {
     "title": "BRD: {project_name}",
     "version": "1.0",
     "status": "Draft",
-    "sections": {{
-        "executive_summary": "2-4 bullets: goal, primary users, value, pain removed, architectural headline (e.g., event-driven, API-first)",
-        "business_objectives": "SMART objectives with target metrics and success checkpoints",
-        "scope": "In-Scope / Out-of-Scope bullets and key assumptions; call out integrations and data domains in scope",
-        "functional_requirements": "Numbered FR list with ID, title, behavior, acceptance note, priority; include API/flow hooks where relevant",
-        "non_functional_requirements": "NFRs grouped by category (performance, security, availability, privacy, scalability, observability) with measurable thresholds",
-        "stakeholders_decisions": "Roles, RACI hints, and major decisions/approvals (architecture, vendors, data residency)",
-        "risks_constraints": "Risk table style: risk, impact, mitigation, owner; include technical constraints/dependencies",
-        "feature_prioritization": "MoSCoW or P0/P1/P2 grouping with rationale and sequencing hints",
-        "timeline_milestones": "Milestones with dates or relative weeks; include next step and architecture/infra checkpoints"
-    }},
-    "metadata": {{ "project_name": "{project_name}" }}
+    "sections": {
+        "executive_summary": "2-4 bullets: goal, primary users, value, pain removed, architectural headline grounded in text",
+        "business_objectives": "SMART objectives with target metrics from text; if absent, say 'Not specified'",
+        "scope": "In-Scope / Out-of-Scope bullets and key assumptions (only if present); call out integrations/data domains mentioned",
+        "functional_requirements": "Numbered FR list with ID, title, behavior, acceptance note, priority; only items stated in source",
+        "non_functional_requirements": "NFRs grouped by category with measurable thresholds only if provided; else 'Not specified'",
+        "stakeholders_decisions": "Roles, RACI hints, decisions explicitly mentioned; no new roles",
+        "risks_constraints": "Risk table: risk, impact, mitigation, owner—all from source; otherwise 'Not specified'",
+        "feature_prioritization": "MoSCoW or P0/P1/P2 grouping only if priorities exist; else 'Not specified'",
+        "timeline_milestones": "Milestones/dates or relative timing if provided; else 'Not specified'"
+    },
+    "metadata": { "project_name": "{project_name}" }
 }}"""
 
     loop = asyncio.get_event_loop()
@@ -565,8 +571,6 @@ def route_intent(state: AgentState) -> Literal["n_brd_extract","n_calendar","n_e
     intent = state.get("intent", "general")
     if intent == "escalate":
         return "n_escalate"
-    if state.get("urgency_score", 0) >= ESCALATION_THRESHOLD and state.get("sentiment") in ("frustrated", "urgent"):
-        return "n_escalate"
     if intent == "brd":
         return "n_brd_extract"
     if intent in ("schedule", "cancel", "update"):
@@ -575,16 +579,12 @@ def route_intent(state: AgentState) -> Literal["n_brd_extract","n_calendar","n_e
 
 def route_after_brd_gaps(state: AgentState) -> Literal["n_brd_write","n_escalate"]:
     gaps = state.get("brd_gaps", {})
-    if not gaps.get("can_proceed", True) and state.get("urgency_score", 0) < ESCALATION_THRESHOLD:
-        return "n_escalate" 
     return "n_brd_write"
 
 def route_after_calendar(state: AgentState) -> Literal["n_compose","n_escalate"]:
     return "n_compose"
 
 def route_final(state: AgentState) -> Literal["end","n_escalate"]:
-    if state.get("needs_human"):
-        return "n_escalate"
     return "end"
 
 def build_graph():
