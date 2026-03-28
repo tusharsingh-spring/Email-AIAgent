@@ -134,8 +134,8 @@ export default function Dashboard() {
         <div className="htag mb-4">Command Center / Daily Briefing</div>
 
         <h1 className="font-bebas text-[clamp(52px,12vw,120px)] leading-[0.88] tracking-[-0.01em] uppercase mb-6">
-          <span className="block text-white/30">{getGreeting()}</span>
-          <span className="block text-brand-blue">Commander</span>
+          <span className="white/30">{getGreeting()}</span>
+         
         </h1>
 
         <p className="section-body mb-8">
