@@ -1,0 +1,226 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="609pt" height="651pt" viewBox="0.00 0.00 609.00 651.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 647.09)">
+<title>LangGraphAgent</title>
+<polygon fill="#ffffff" stroke="none" points="-4,4 -4,-647.09 605.34,-647.09 605.34,4 -4,4"/>
+<!-- START -->
+<g id="node1" class="node">
+<title>START</title>
+<ellipse fill="#c8e6c9" stroke="#388e3c" cx="259.63" cy="-614.43" rx="28.67" ry="28.67"/>
+<text xml:space="preserve" text-anchor="middle" x="259.63" y="-611.43" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">START</text>
+</g>
+<!-- Intent -->
+<g id="node3" class="node">
+<title>Intent</title>
+<path fill="#e3f2fd" stroke="#1976d2" d="M320.92,-548.76C320.92,-548.76 198.33,-548.76 198.33,-548.76 192.33,-548.76 186.33,-542.76 186.33,-536.76 186.33,-536.76 186.33,-524.76 186.33,-524.76 186.33,-518.76 192.33,-512.76 198.33,-512.76 198.33,-512.76 320.92,-512.76 320.92,-512.76 326.92,-512.76 332.92,-518.76 332.92,-524.76 332.92,-524.76 332.92,-536.76 332.92,-536.76 332.92,-542.76 326.92,-548.76 320.92,-548.76"/>
+<text xml:space="preserve" text-anchor="middle" x="259.63" y="-533.76" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Intent Router</text>
+<text xml:space="preserve" text-anchor="middle" x="259.63" y="-521.76" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">(Groq LLM + heuristic fallback)</text>
+</g>
+<!-- START&#45;&gt;Intent -->
+<g id="edge1" class="edge">
+<title>START-&gt;Intent</title>
+<path fill="none" stroke="#78909c" d="M259.63,-585.32C259.63,-577.35 259.63,-568.67 259.63,-560.66"/>
+<polygon fill="#78909c" stroke="#78909c" points="263.13,-560.71 259.63,-550.71 256.13,-560.71 263.13,-560.71"/>
+</g>
+<!-- ENDNODE -->
+<g id="node2" class="node">
+<title>ENDNODE</title>
+<ellipse fill="#ffcdd2" stroke="#d32f2f" cx="123.63" cy="-25.98" rx="21.98" ry="21.98"/>
+<ellipse fill="none" stroke="#d32f2f" cx="123.63" cy="-25.98" rx="25.98" ry="25.98"/>
+<text xml:space="preserve" text-anchor="middle" x="123.63" y="-22.98" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#b71c1c">END</text>
+</g>
+<!-- BRD_Extract -->
+<g id="node4" class="node">
+<title>BRD_Extract</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M453.89,-465.96C453.89,-465.96 299.36,-465.96 299.36,-465.96 293.36,-465.96 287.36,-459.96 287.36,-453.96 287.36,-453.96 287.36,-441.96 287.36,-441.96 287.36,-435.96 293.36,-429.96 299.36,-429.96 299.36,-429.96 453.89,-429.96 453.89,-429.96 459.89,-429.96 465.89,-435.96 465.89,-441.96 465.89,-441.96 465.89,-453.96 465.89,-453.96 465.89,-459.96 459.89,-465.96 453.89,-465.96"/>
+<text xml:space="preserve" text-anchor="middle" x="376.63" y="-450.96" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">BRD Extraction</text>
+<text xml:space="preserve" text-anchor="middle" x="376.63" y="-438.96" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">(context from Supabase + thread emails)</text>
+</g>
+<!-- Intent&#45;&gt;BRD_Extract -->
+<g id="edge2" class="edge">
+<title>Intent-&gt;BRD_Extract</title>
+<path fill="none" stroke="#78909c" d="M284.73,-512.43C301.54,-500.82 323.88,-485.39 342.33,-472.65"/>
+<polygon fill="#78909c" stroke="#78909c" points="344.08,-475.69 350.32,-467.12 340.11,-469.93 344.08,-475.69"/>
+<text xml:space="preserve" text-anchor="middle" x="343.92" y="-486.66" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">intent=brd</text>
+</g>
+<!-- Calendar -->
+<g id="node8" class="node">
+<title>Calendar</title>
+<path fill="#e3f2fd" stroke="#1976d2" d="M189.81,-465.96C189.81,-465.96 99.44,-465.96 99.44,-465.96 93.44,-465.96 87.44,-459.96 87.44,-453.96 87.44,-453.96 87.44,-441.96 87.44,-441.96 87.44,-435.96 93.44,-429.96 99.44,-429.96 99.44,-429.96 189.81,-429.96 189.81,-429.96 195.81,-429.96 201.81,-435.96 201.81,-441.96 201.81,-441.96 201.81,-453.96 201.81,-453.96 201.81,-459.96 195.81,-465.96 189.81,-465.96"/>
+<text xml:space="preserve" text-anchor="middle" x="144.63" y="-450.96" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Calendar Agent</text>
+<text xml:space="preserve" text-anchor="middle" x="144.63" y="-438.96" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">(find slot + create event)</text>
+</g>
+<!-- Intent&#45;&gt;Calendar -->
+<g id="edge3" class="edge">
+<title>Intent-&gt;Calendar</title>
+<path fill="none" stroke="#78909c" d="M185.94,-524.2C167.43,-519.07 149.56,-510.12 138,-494.76 134.19,-489.71 133.35,-483.43 134.02,-477.15"/>
+<polygon fill="#78909c" stroke="#78909c" points="137.38,-478.14 136.19,-467.62 130.56,-476.59 137.38,-478.14"/>
+<text xml:space="preserve" text-anchor="middle" x="191.81" y="-486.66" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">intent=schedule|cancel|update</text>
+</g>
+<!-- Compose -->
+<g id="node9" class="node">
+<title>Compose</title>
+<path fill="#e3f2fd" stroke="#1976d2" d="M295.47,-134.76C295.47,-134.76 223.79,-134.76 223.79,-134.76 217.79,-134.76 211.79,-128.76 211.79,-122.76 211.79,-122.76 211.79,-110.76 211.79,-110.76 211.79,-104.76 217.79,-98.76 223.79,-98.76 223.79,-98.76 295.47,-98.76 295.47,-98.76 301.47,-98.76 307.47,-104.76 307.47,-110.76 307.47,-110.76 307.47,-122.76 307.47,-122.76 307.47,-128.76 301.47,-134.76 295.47,-134.76"/>
+<text xml:space="preserve" text-anchor="middle" x="259.63" y="-119.76" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Reply Composer</text>
+<text xml:space="preserve" text-anchor="middle" x="259.63" y="-107.76" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">(intent-aware reply)</text>
+</g>
+<!-- Intent&#45;&gt;Compose -->
+<g id="edge5" class="edge">
+<title>Intent-&gt;Compose</title>
+<path fill="none" stroke="#78909c" d="M259.63,-512.42C259.63,-496.06 259.63,-470.84 259.63,-448.96 259.63,-448.96 259.63,-448.96 259.63,-198.56 259.63,-181.29 259.63,-161.95 259.63,-146.52"/>
+<polygon fill="#78909c" stroke="#78909c" points="263.13,-146.61 259.63,-136.61 256.13,-146.61 263.13,-146.61"/>
+<text xml:space="preserve" text-anchor="middle" x="296.15" y="-321.06" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">intent=general/other</text>
+</g>
+<!-- Escalate -->
+<g id="node10" class="node">
+<title>Escalate</title>
+<path fill="#fff9c4" stroke="#fbc02d" d="M79.25,-383.16C79.25,-383.16 12,-383.16 12,-383.16 6,-383.16 0,-377.16 0,-371.16 0,-371.16 0,-359.16 0,-359.16 0,-353.16 6,-347.16 12,-347.16 12,-347.16 79.25,-347.16 79.25,-347.16 85.25,-347.16 91.25,-353.16 91.25,-359.16 91.25,-359.16 91.25,-371.16 91.25,-371.16 91.25,-377.16 85.25,-383.16 79.25,-383.16"/>
+<text xml:space="preserve" text-anchor="middle" x="45.63" y="-368.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#f57f17">Escalation Node</text>
+<text xml:space="preserve" text-anchor="middle" x="45.63" y="-356.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#f57f17">(set needs_human)</text>
+</g>
+<!-- Intent&#45;&gt;Escalate -->
+<g id="edge4" class="edge">
+<title>Intent-&gt;Escalate</title>
+<path fill="none" stroke="#78909c" d="M185.92,-519.63C124.58,-509.5 44.23,-491.72 24.58,-465.96 8.71,-445.15 18.18,-415.1 29.02,-393.42"/>
+<polygon fill="#78909c" stroke="#78909c" points="31.97,-395.32 33.63,-384.85 25.81,-392 31.97,-395.32"/>
+<text xml:space="preserve" text-anchor="middle" x="51.6" y="-445.26" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">intent=escalate</text>
+</g>
+<!-- Gmail -->
+<g id="node13" class="node">
+<title>Gmail</title>
+<polygon fill="#f3e5f5" stroke="#8e24aa" points="582.87,-465.96 484.39,-465.96 484.39,-429.96 582.87,-429.96 582.87,-465.96"/>
+<text xml:space="preserve" text-anchor="middle" x="533.63" y="-444.96" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Gmail Threads/Send</text>
+</g>
+<!-- Intent&#45;&gt;Gmail -->
+<g id="edge18" class="edge">
+<title>Intent-&gt;Gmail</title>
+<path fill="none" stroke="#78909c" d="M318.74,-512.33C364.38,-498.87 427.28,-480.32 473.23,-466.77"/>
+<polygon fill="#78909c" stroke="#78909c" points="474.18,-470.14 482.79,-463.95 472.2,-463.42 474.18,-470.14"/>
+<text xml:space="preserve" text-anchor="middle" x="450.27" y="-486.66" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">optional thread fetch</text>
+</g>
+<!-- BRD_Gaps -->
+<g id="node5" class="node">
+<title>BRD_Gaps</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M369.36,-383.16C369.36,-383.16 299.89,-383.16 299.89,-383.16 293.89,-383.16 287.89,-377.16 287.89,-371.16 287.89,-371.16 287.89,-359.16 287.89,-359.16 287.89,-353.16 293.89,-347.16 299.89,-347.16 299.89,-347.16 369.36,-347.16 369.36,-347.16 375.36,-347.16 381.36,-353.16 381.36,-359.16 381.36,-359.16 381.36,-371.16 381.36,-371.16 381.36,-377.16 375.36,-383.16 369.36,-383.16"/>
+<text xml:space="preserve" text-anchor="middle" x="334.63" y="-368.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">BRD Gap Check</text>
+<text xml:space="preserve" text-anchor="middle" x="334.63" y="-356.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">(disable escalation)</text>
+</g>
+<!-- BRD_Extract&#45;&gt;BRD_Gaps -->
+<g id="edge6" class="edge">
+<title>BRD_Extract-&gt;BRD_Gaps</title>
+<path fill="none" stroke="#78909c" d="M367.72,-429.82C362.24,-419.29 355.11,-405.56 348.86,-393.54"/>
+<polygon fill="#78909c" stroke="#78909c" points="352.08,-392.15 344.36,-384.89 345.87,-395.38 352.08,-392.15"/>
+</g>
+<!-- LLM -->
+<g id="node11" class="node">
+<title>LLM</title>
+<polygon fill="#f3e5f5" stroke="#8e24aa" points="447.45,-43.98 339.81,-43.98 339.81,-7.98 447.45,-7.98 447.45,-43.98"/>
+<text xml:space="preserve" text-anchor="middle" x="393.63" y="-22.98" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">LLM (Groq / local T5)</text>
+</g>
+<!-- BRD_Extract&#45;&gt;LLM -->
+<g id="edge15" class="edge">
+<title>BRD_Extract-&gt;LLM</title>
+<path fill="none" stroke="#78909c" d="M466.21,-430.63C498.72,-419.09 527.63,-399.46 527.63,-366.16 527.63,-366.16 527.63,-366.16 527.63,-115.76 527.63,-79.22 492.56,-56.83 458.31,-43.68"/>
+<polygon fill="#78909c" stroke="#78909c" points="459.76,-40.48 449.17,-40.4 457.4,-47.07 459.76,-40.48"/>
+<text xml:space="preserve" text-anchor="middle" x="564.48" y="-238.26" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">extract requirements</text>
+</g>
+<!-- DB -->
+<g id="node12" class="node">
+<title>DB</title>
+<polygon fill="#f3e5f5" stroke="#8e24aa" points="499.69,-383.16 399.56,-383.16 399.56,-347.16 499.69,-347.16 499.69,-383.16"/>
+<text xml:space="preserve" text-anchor="middle" x="449.63" y="-368.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Supabase Context</text>
+<text xml:space="preserve" text-anchor="middle" x="449.63" y="-356.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">(project emails/docs)</text>
+</g>
+<!-- BRD_Extract&#45;&gt;DB -->
+<g id="edge14" class="edge">
+<title>BRD_Extract-&gt;DB</title>
+<path fill="none" stroke="#78909c" d="M392.11,-429.82C402.11,-418.76 415.29,-404.16 426.52,-391.73"/>
+<polygon fill="#78909c" stroke="#78909c" points="428.79,-394.44 432.9,-384.67 423.6,-389.75 428.79,-394.44"/>
+<text xml:space="preserve" text-anchor="middle" x="440.86" y="-403.86" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">fetch context</text>
+</g>
+<!-- BRD_Write -->
+<g id="node6" class="node">
+<title>BRD_Write</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M475.54,-300.36C475.54,-300.36 299.71,-300.36 299.71,-300.36 293.71,-300.36 287.71,-294.36 287.71,-288.36 287.71,-288.36 287.71,-276.36 287.71,-276.36 287.71,-270.36 293.71,-264.36 299.71,-264.36 299.71,-264.36 475.54,-264.36 475.54,-264.36 481.54,-264.36 487.54,-270.36 487.54,-276.36 487.54,-276.36 487.54,-288.36 487.54,-288.36 487.54,-294.36 481.54,-300.36 475.54,-300.36"/>
+<text xml:space="preserve" text-anchor="middle" x="387.63" y="-285.36" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">BRD Writer</text>
+<text xml:space="preserve" text-anchor="middle" x="387.63" y="-273.36" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">(LLM sections or section-by-section fallback)</text>
+</g>
+<!-- BRD_Gaps&#45;&gt;BRD_Write -->
+<g id="edge7" class="edge">
+<title>BRD_Gaps-&gt;BRD_Write</title>
+<path fill="none" stroke="#78909c" d="M345.87,-347.02C352.92,-336.28 362.15,-322.2 370.14,-310.02"/>
+<polygon fill="#78909c" stroke="#78909c" points="372.83,-312.3 375.39,-302.01 366.98,-308.46 372.83,-312.3"/>
+<text xml:space="preserve" text-anchor="middle" x="403.65" y="-321.06" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">can_proceed (always)</text>
+</g>
+<!-- BRD_Assemble -->
+<g id="node7" class="node">
+<title>BRD_Assemble</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M353.88,-217.56C353.88,-217.56 299.38,-217.56 299.38,-217.56 293.38,-217.56 287.38,-211.56 287.38,-205.56 287.38,-205.56 287.38,-193.56 287.38,-193.56 287.38,-187.56 293.38,-181.56 299.38,-181.56 299.38,-181.56 353.88,-181.56 353.88,-181.56 359.88,-181.56 365.88,-187.56 365.88,-193.56 365.88,-193.56 365.88,-205.56 365.88,-205.56 365.88,-211.56 359.88,-217.56 353.88,-217.56"/>
+<text xml:space="preserve" text-anchor="middle" x="326.63" y="-202.56" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">BRD Assemble</text>
+<text xml:space="preserve" text-anchor="middle" x="326.63" y="-190.56" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">(pass-through)</text>
+</g>
+<!-- BRD_Write&#45;&gt;BRD_Assemble -->
+<g id="edge8" class="edge">
+<title>BRD_Write-&gt;BRD_Assemble</title>
+<path fill="none" stroke="#78909c" d="M374.69,-264.22C366.5,-253.37 355.74,-239.12 346.48,-226.85"/>
+<polygon fill="#78909c" stroke="#78909c" points="349.49,-225.03 340.67,-219.16 343.9,-229.25 349.49,-225.03"/>
+</g>
+<!-- BRD_Write&#45;&gt;LLM -->
+<g id="edge16" class="edge">
+<title>BRD_Write-&gt;LLM</title>
+<path fill="none" stroke="#78909c" d="M388.04,-263.88C389.06,-220.66 391.7,-108.48 392.95,-55.49"/>
+<polygon fill="#78909c" stroke="#78909c" points="396.45,-55.84 393.18,-45.76 389.45,-55.68 396.45,-55.84"/>
+<text xml:space="preserve" text-anchor="middle" x="415.5" y="-155.46" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">write sections</text>
+</g>
+<!-- BRD_Assemble&#45;&gt;Compose -->
+<g id="edge9" class="edge">
+<title>BRD_Assemble-&gt;Compose</title>
+<path fill="none" stroke="#78909c" d="M312.42,-181.42C303.33,-170.46 291.37,-156.04 281.13,-143.69"/>
+<polygon fill="#78909c" stroke="#78909c" points="284.09,-141.78 275.01,-136.31 278.7,-146.25 284.09,-141.78"/>
+</g>
+<!-- Calendar&#45;&gt;Compose -->
+<g id="edge10" class="edge">
+<title>Calendar-&gt;Compose</title>
+<path fill="none" stroke="#78909c" d="M135.88,-429.47C128.67,-413.42 119.63,-388.77 119.63,-366.16 119.63,-366.16 119.63,-366.16 119.63,-198.56 119.63,-158.97 162.14,-138.48 200.31,-128.06"/>
+<polygon fill="#78909c" stroke="#78909c" points="201.14,-131.46 209.98,-125.62 199.43,-124.67 201.14,-131.46"/>
+</g>
+<!-- Calendar&#45;&gt;Escalate -->
+<g id="edge11" class="edge">
+<title>Calendar-&gt;Escalate</title>
+<path fill="none" stroke="#e53935" stroke-dasharray="5,2" d="M96.63,-429.54C87.41,-424.78 78.32,-418.95 70.89,-411.96 65.42,-406.81 60.85,-400.21 57.17,-393.64"/>
+<polygon fill="#e53935" stroke="#e53935" points="60.39,-392.26 52.79,-384.88 54.13,-395.39 60.39,-392.26"/>
+<text xml:space="preserve" text-anchor="middle" x="88.26" y="-403.86" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#c62828">on failure</text>
+</g>
+<!-- GCal -->
+<g id="node14" class="node">
+<title>GCal</title>
+<polygon fill="#f3e5f5" stroke="#8e24aa" points="231.64,-383.16 147.61,-383.16 147.61,-347.16 231.64,-347.16 231.64,-383.16"/>
+<text xml:space="preserve" text-anchor="middle" x="189.63" y="-362.16" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Google Calendar</text>
+</g>
+<!-- Calendar&#45;&gt;GCal -->
+<g id="edge17" class="edge">
+<title>Calendar-&gt;GCal</title>
+<path fill="none" stroke="#78909c" d="M154.17,-429.82C160.04,-419.29 167.69,-405.56 174.38,-393.54"/>
+<polygon fill="#78909c" stroke="#78909c" points="177.4,-395.31 179.21,-384.87 171.28,-391.91 177.4,-395.31"/>
+<text xml:space="preserve" text-anchor="middle" x="202.09" y="-403.86" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">free/busy + create</text>
+</g>
+<!-- Compose&#45;&gt;ENDNODE -->
+<g id="edge12" class="edge">
+<title>Compose-&gt;ENDNODE</title>
+<path fill="none" stroke="#78909c" d="M233.08,-98.43C210.63,-83.77 178.42,-62.75 154.75,-47.3"/>
+<polygon fill="#78909c" stroke="#78909c" points="156.74,-44.41 146.45,-41.88 152.91,-50.28 156.74,-44.41"/>
+</g>
+<!-- Compose&#45;&gt;LLM -->
+<g id="edge19" class="edge">
+<title>Compose-&gt;LLM</title>
+<path fill="none" stroke="#78909c" d="M285.78,-98.43C306.44,-84.74 335.48,-65.5 358.22,-50.44"/>
+<polygon fill="#78909c" stroke="#78909c" points="359.87,-53.54 366.28,-45.1 356.01,-47.71 359.87,-53.54"/>
+<text xml:space="preserve" text-anchor="middle" x="345.49" y="-72.66" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">draft reply</text>
+</g>
+<!-- Escalate&#45;&gt;ENDNODE -->
+<g id="edge13" class="edge">
+<title>Escalate-&gt;ENDNODE</title>
+<path fill="none" stroke="#78909c" d="M51.82,-346.76C57.03,-330.56 63.63,-305.64 63.63,-283.36 63.63,-283.36 63.63,-283.36 63.63,-115.76 63.63,-90.73 80.2,-67.49 95.93,-51.07"/>
+<polygon fill="#78909c" stroke="#78909c" points="98.24,-53.7 102.9,-44.19 93.32,-48.72 98.24,-53.7"/>
+</g>
+</g>
+</svg>
