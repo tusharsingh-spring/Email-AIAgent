@@ -1,0 +1,299 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1242pt" height="478pt" viewBox="0.00 0.00 1242.00 478.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 473.6)">
+<title>EmailAI</title>
+<polygon fill="#ffffff" stroke="none" points="-4,4 -4,-473.6 1237.75,-473.6 1237.75,4 -4,4"/>
+<g id="clust1" class="cluster">
+<title>cluster_frontend</title>
+<polygon fill="#e3f2fd" stroke="#1e88e5" points="616,-384.8 616,-461.6 974,-461.6 974,-384.8 616,-384.8"/>
+<text xml:space="preserve" text-anchor="middle" x="795" y="-445" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#0d47a1">Frontend (Vite/React)</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_extension</title>
+<polygon fill="#fff3e0" stroke="#fb8c00" points="990,-384.8 990,-461.6 1179,-461.6 1179,-384.8 990,-384.8"/>
+<text xml:space="preserve" text-anchor="middle" x="1084.5" y="-445" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#e65100">Chrome Extension</text>
+</g>
+<g id="clust3" class="cluster">
+<title>cluster_backend</title>
+<polygon fill="#e8f5e9" stroke="#43a047" points="666,-8 666,-356 926,-356 926,-8 666,-8"/>
+<text xml:space="preserve" text-anchor="middle" x="796" y="-339.4" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#1b5e20">Backend (FastAPI)</text>
+</g>
+<g id="clust4" class="cluster">
+<title>cluster_services</title>
+<polygon fill="#f3e5f5" stroke="#8e24aa" points="8,-8 8,-84.8 658,-84.8 658,-8 8,-8"/>
+<text xml:space="preserve" text-anchor="middle" x="333" y="-68.2" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#4a148c">Services / Integrations</text>
+</g>
+<g id="clust5" class="cluster">
+<title>cluster_artifacts</title>
+<polygon fill="#f5f5f5" stroke="#757575" points="946,-8 946,-84.8 1176,-84.8 1176,-8 946,-8"/>
+<text xml:space="preserve" text-anchor="middle" x="1061" y="-68.2" font-family="Helvetica,Arial,sans-serif" font-size="14.00" fill="#212121">Artifacts / Observability</text>
+</g>
+<!-- FE_Dashboard -->
+<g id="node1" class="node">
+<title>FE_Dashboard</title>
+<path fill="#bbdefb" stroke="#1976d2" d="M856.1,-428.8C856.1,-428.8 781.9,-428.8 781.9,-428.8 775.9,-428.8 769.9,-422.8 769.9,-416.8 769.9,-416.8 769.9,-404.8 769.9,-404.8 769.9,-398.8 775.9,-392.8 781.9,-392.8 781.9,-392.8 856.1,-392.8 856.1,-392.8 862.1,-392.8 868.1,-398.8 868.1,-404.8 868.1,-404.8 868.1,-416.8 868.1,-416.8 868.1,-422.8 862.1,-428.8 856.1,-428.8"/>
+<text xml:space="preserve" text-anchor="middle" x="819" y="-407.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Dashboard / Actions</text>
+</g>
+<!-- API_Gateway -->
+<g id="node7" class="node">
+<title>API_Gateway</title>
+<path fill="#c8e6c9" stroke="#388e3c" d="M800.19,-323.2C800.19,-323.2 751.81,-323.2 751.81,-323.2 745.81,-323.2 739.81,-317.2 739.81,-311.2 739.81,-311.2 739.81,-299.2 739.81,-299.2 739.81,-293.2 745.81,-287.2 751.81,-287.2 751.81,-287.2 800.19,-287.2 800.19,-287.2 806.19,-287.2 812.19,-293.2 812.19,-299.2 812.19,-299.2 812.19,-311.2 812.19,-311.2 812.19,-317.2 806.19,-323.2 800.19,-323.2"/>
+<text xml:space="preserve" text-anchor="middle" x="776" y="-302.2" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">/api endpoints</text>
+</g>
+<!-- FE_Dashboard&#45;&gt;API_Gateway -->
+<g id="edge1" class="edge">
+<title>FE_Dashboard-&gt;API_Gateway</title>
+<path fill="none" stroke="#78909c" d="M803.41,-392.61C799.19,-387.22 794.97,-381.04 792.01,-374.8 786.09,-362.32 782.28,-347.51 779.87,-334.84"/>
+<polygon fill="#78909c" stroke="#78909c" points="783.32,-334.28 778.21,-325 776.42,-335.44 783.32,-334.28"/>
+<text xml:space="preserve" text-anchor="middle" x="829.01" y="-366.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">actions, stats, emails</text>
+</g>
+<!-- FE_Bandit -->
+<g id="node2" class="node">
+<title>FE_Bandit</title>
+<path fill="#bbdefb" stroke="#1976d2" d="M667.86,-428.8C667.86,-428.8 636.14,-428.8 636.14,-428.8 630.14,-428.8 624.14,-422.8 624.14,-416.8 624.14,-416.8 624.14,-404.8 624.14,-404.8 624.14,-398.8 630.14,-392.8 636.14,-392.8 636.14,-392.8 667.86,-392.8 667.86,-392.8 673.86,-392.8 679.86,-398.8 679.86,-404.8 679.86,-404.8 679.86,-416.8 679.86,-416.8 679.86,-422.8 673.86,-428.8 667.86,-428.8"/>
+<text xml:space="preserve" text-anchor="middle" x="652" y="-407.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Bandit UI</text>
+</g>
+<!-- FE_Bandit&#45;&gt;API_Gateway -->
+<g id="edge2" class="edge">
+<title>FE_Bandit-&gt;API_Gateway</title>
+<path fill="none" stroke="#78909c" d="M652.61,-392.63C653.72,-383.32 656.43,-372.1 662.79,-364 679.3,-342.94 705.58,-328.86 728.67,-319.87"/>
+<polygon fill="#78909c" stroke="#78909c" points="729.72,-323.21 737.92,-316.5 727.33,-316.64 729.72,-323.21"/>
+<text xml:space="preserve" text-anchor="middle" x="700.89" y="-366.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">bandit state/feedback</text>
+</g>
+<!-- FE_Projects -->
+<g id="node3" class="node">
+<title>FE_Projects</title>
+<path fill="#bbdefb" stroke="#1976d2" d="M954.22,-428.8C954.22,-428.8 897.78,-428.8 897.78,-428.8 891.78,-428.8 885.78,-422.8 885.78,-416.8 885.78,-416.8 885.78,-404.8 885.78,-404.8 885.78,-398.8 891.78,-392.8 897.78,-392.8 897.78,-392.8 954.22,-392.8 954.22,-392.8 960.22,-392.8 966.22,-398.8 966.22,-404.8 966.22,-404.8 966.22,-416.8 966.22,-416.8 966.22,-422.8 960.22,-428.8 954.22,-428.8"/>
+<text xml:space="preserve" text-anchor="middle" x="926" y="-407.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Projects / BRDs</text>
+</g>
+<!-- FE_Projects&#45;&gt;API_Gateway -->
+<g id="edge3" class="edge">
+<title>FE_Projects-&gt;API_Gateway</title>
+<path fill="none" stroke="#78909c" d="M904.09,-392.4C892.86,-383.65 878.88,-373.03 866,-364 849.25,-352.26 830.26,-339.92 814.05,-329.67"/>
+<polygon fill="#78909c" stroke="#78909c" points="815.97,-326.75 805.64,-324.39 812.25,-332.68 815.97,-326.75"/>
+<text xml:space="preserve" text-anchor="middle" x="919.16" y="-366.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">projects, brds, context</text>
+</g>
+<!-- FE_Calendar -->
+<g id="node4" class="node">
+<title>FE_Calendar</title>
+<path fill="#bbdefb" stroke="#1976d2" d="M740,-428.8C740,-428.8 710,-428.8 710,-428.8 704,-428.8 698,-422.8 698,-416.8 698,-416.8 698,-404.8 698,-404.8 698,-398.8 704,-392.8 710,-392.8 710,-392.8 740,-392.8 740,-392.8 746,-392.8 752,-398.8 752,-404.8 752,-404.8 752,-416.8 752,-416.8 752,-422.8 746,-428.8 740,-428.8"/>
+<text xml:space="preserve" text-anchor="middle" x="725" y="-407.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Calendar</text>
+</g>
+<!-- FE_Calendar&#45;&gt;API_Gateway -->
+<g id="edge4" class="edge">
+<title>FE_Calendar-&gt;API_Gateway</title>
+<path fill="none" stroke="#78909c" d="M733.42,-392.69C741.27,-376.74 753.12,-352.67 762.33,-333.97"/>
+<polygon fill="#78909c" stroke="#78909c" points="765.45,-335.55 766.73,-325.04 759.17,-332.46 765.45,-335.55"/>
+<text xml:space="preserve" text-anchor="middle" x="758.94" y="-366.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">events</text>
+</g>
+<!-- EXT_Popup -->
+<g id="node5" class="node">
+<title>EXT_Popup</title>
+<path fill="#ffe0b2" stroke="#f57c00" d="M1040.31,-428.8C1040.31,-428.8 1009.69,-428.8 1009.69,-428.8 1003.69,-428.8 997.69,-422.8 997.69,-416.8 997.69,-416.8 997.69,-404.8 997.69,-404.8 997.69,-398.8 1003.69,-392.8 1009.69,-392.8 1009.69,-392.8 1040.31,-392.8 1040.31,-392.8 1046.31,-392.8 1052.31,-398.8 1052.31,-404.8 1052.31,-404.8 1052.31,-416.8 1052.31,-416.8 1052.31,-422.8 1046.31,-428.8 1040.31,-428.8"/>
+<text xml:space="preserve" text-anchor="middle" x="1025" y="-407.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">Popup UI</text>
+</g>
+<!-- EXT_Popup&#45;&gt;API_Gateway -->
+<g id="edge5" class="edge">
+<title>EXT_Popup-&gt;API_Gateway</title>
+<path fill="none" stroke="#78909c" d="M1005.19,-392.47C993.55,-383 978.17,-371.67 963,-364 918.01,-341.26 862.36,-325.46 823.52,-316.2"/>
+<polygon fill="#78909c" stroke="#78909c" points="824.54,-312.85 814.01,-313.99 822.96,-319.66 824.54,-312.85"/>
+<text xml:space="preserve" text-anchor="middle" x="1024.06" y="-366.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">upload transcripts/notes</text>
+</g>
+<!-- EXT_Scrape -->
+<g id="node6" class="node">
+<title>EXT_Scrape</title>
+<path fill="#ffe0b2" stroke="#f57c00" d="M1159.49,-428.8C1159.49,-428.8 1082.51,-428.8 1082.51,-428.8 1076.51,-428.8 1070.51,-422.8 1070.51,-416.8 1070.51,-416.8 1070.51,-404.8 1070.51,-404.8 1070.51,-398.8 1076.51,-392.8 1082.51,-392.8 1082.51,-392.8 1159.49,-392.8 1159.49,-392.8 1165.49,-392.8 1171.49,-398.8 1171.49,-404.8 1171.49,-404.8 1171.49,-416.8 1171.49,-416.8 1171.49,-422.8 1165.49,-428.8 1159.49,-428.8"/>
+<text xml:space="preserve" text-anchor="middle" x="1121" y="-407.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">Scraping / Recording</text>
+</g>
+<!-- EXT_Scrape&#45;&gt;API_Gateway -->
+<g id="edge6" class="edge">
+<title>EXT_Scrape-&gt;API_Gateway</title>
+<path fill="none" stroke="#78909c" d="M1106.51,-392.45C1097.34,-382.6 1084.66,-370.9 1071,-364 990.64,-323.43 884.63,-311.29 824.03,-307.69"/>
+<polygon fill="#78909c" stroke="#78909c" points="824.22,-304.19 814.05,-307.15 823.85,-311.18 824.22,-304.19"/>
+<text xml:space="preserve" text-anchor="middle" x="1108.14" y="-366.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">scraped text</text>
+</g>
+<!-- Ingest -->
+<g id="node8" class="node">
+<title>Ingest</title>
+<path fill="#c8e6c9" stroke="#388e3c" d="M788.17,-240.4C788.17,-240.4 695.83,-240.4 695.83,-240.4 689.83,-240.4 683.83,-234.4 683.83,-228.4 683.83,-228.4 683.83,-216.4 683.83,-216.4 683.83,-210.4 689.83,-204.4 695.83,-204.4 695.83,-204.4 788.17,-204.4 788.17,-204.4 794.17,-204.4 800.17,-210.4 800.17,-216.4 800.17,-216.4 800.17,-228.4 800.17,-228.4 800.17,-234.4 794.17,-240.4 788.17,-240.4"/>
+<text xml:space="preserve" text-anchor="middle" x="742" y="-219.4" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">Email ingest + clustering</text>
+</g>
+<!-- API_Gateway&#45;&gt;Ingest -->
+<g id="edge7" class="edge">
+<title>API_Gateway-&gt;Ingest</title>
+<path fill="none" stroke="#78909c" d="M768.79,-287.06C764.4,-276.64 758.69,-263.07 753.68,-251.15"/>
+<polygon fill="#78909c" stroke="#78909c" points="757.01,-250.04 749.9,-242.18 750.56,-252.76 757.01,-250.04"/>
+<text xml:space="preserve" text-anchor="middle" x="790.91" y="-261.1" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">incoming emails</text>
+</g>
+<!-- Bandit -->
+<g id="node10" class="node">
+<title>Bandit</title>
+<path fill="#c8e6c9" stroke="#388e3c" d="M906.27,-52C906.27,-52 811.73,-52 811.73,-52 805.73,-52 799.73,-46 799.73,-40 799.73,-40 799.73,-28 799.73,-28 799.73,-22 805.73,-16 811.73,-16 811.73,-16 906.27,-16 906.27,-16 912.27,-16 918.27,-22 918.27,-28 918.27,-28 918.27,-40 918.27,-40 918.27,-46 912.27,-52 906.27,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="859" y="-37" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">Bandit router</text>
+<text xml:space="preserve" text-anchor="middle" x="859" y="-25" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">ε-greedy + heuristic prior</text>
+</g>
+<!-- API_Gateway&#45;&gt;Bandit -->
+<g id="edge11" class="edge">
+<title>API_Gateway-&gt;Bandit</title>
+<path fill="none" stroke="#78909c" d="M805.9,-286.7C812.79,-281.69 819.66,-275.77 825,-269.2 875.76,-206.8 881.42,-182.31 898,-103.6 901.2,-88.43 893.95,-73.27 884.86,-61.07"/>
+<polygon fill="#78909c" stroke="#78909c" points="887.72,-59.04 878.66,-53.54 882.31,-63.48 887.72,-59.04"/>
+<text xml:space="preserve" text-anchor="middle" x="916.51" y="-178.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">assign-email reward</text>
+</g>
+<!-- Gmail -->
+<g id="node12" class="node">
+<title>Gmail</title>
+<path fill="#e1bee7" stroke="#7b1fa2" d="M113.93,-52C113.93,-52 28.07,-52 28.07,-52 22.07,-52 16.07,-46 16.07,-40 16.07,-40 16.07,-28 16.07,-28 16.07,-22 22.07,-16 28.07,-16 28.07,-16 113.93,-16 113.93,-16 119.93,-16 125.93,-22 125.93,-28 125.93,-28 125.93,-40 125.93,-40 125.93,-46 119.93,-52 113.93,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="71" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Gmail API (fetch/send)</text>
+</g>
+<!-- API_Gateway&#45;&gt;Gmail -->
+<g id="edge13" class="edge">
+<title>API_Gateway-&gt;Gmail</title>
+<path fill="none" stroke="#78909c" d="M739.51,-304.68C654.53,-304.72 437.79,-298.59 269,-240.4 222.82,-224.48 209.17,-219.53 173.26,-186.4 133.68,-149.88 101.61,-95.2 84.51,-62.51"/>
+<polygon fill="#78909c" stroke="#78909c" points="87.66,-60.98 79.98,-53.68 81.43,-64.17 87.66,-60.98"/>
+<text xml:space="preserve" text-anchor="middle" x="194.63" y="-178.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">send replies</text>
+</g>
+<!-- Supabase -->
+<g id="node14" class="node">
+<title>Supabase</title>
+<path fill="#e1bee7" stroke="#7b1fa2" d="M303.62,-52C303.62,-52 156.38,-52 156.38,-52 150.38,-52 144.38,-46 144.38,-40 144.38,-40 144.38,-28 144.38,-28 144.38,-22 150.38,-16 156.38,-16 156.38,-16 303.62,-16 303.62,-16 309.62,-16 315.62,-22 315.62,-28 315.62,-28 315.62,-40 315.62,-40 315.62,-46 309.62,-52 303.62,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="230" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Supabase (projects, emails, docs, brds)</text>
+</g>
+<!-- API_Gateway&#45;&gt;Supabase -->
+<g id="edge18" class="edge">
+<title>API_Gateway-&gt;Supabase</title>
+<path fill="none" stroke="#78909c" d="M739.7,-300.64C624.17,-288.5 268.56,-244.54 201,-157.6 179.46,-129.88 196.33,-88.73 211.91,-61.88"/>
+<polygon fill="#78909c" stroke="#78909c" points="214.72,-64 216.95,-53.64 208.75,-60.35 214.72,-64"/>
+<text xml:space="preserve" text-anchor="middle" x="279.62" y="-178.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">projects/docs/brds CRUD</text>
+</g>
+<!-- Agent -->
+<g id="node9" class="node">
+<title>Agent</title>
+<path fill="#c8e6c9" stroke="#388e3c" d="M797.7,-157.6C797.7,-157.6 686.3,-157.6 686.3,-157.6 680.3,-157.6 674.3,-151.6 674.3,-145.6 674.3,-145.6 674.3,-133.6 674.3,-133.6 674.3,-127.6 680.3,-121.6 686.3,-121.6 686.3,-121.6 797.7,-121.6 797.7,-121.6 803.7,-121.6 809.7,-127.6 809.7,-133.6 809.7,-133.6 809.7,-145.6 809.7,-145.6 809.7,-151.6 803.7,-157.6 797.7,-157.6"/>
+<text xml:space="preserve" text-anchor="middle" x="742" y="-142.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">LangGraph agent</text>
+<text xml:space="preserve" text-anchor="middle" x="742" y="-130.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">(intent, BRD, calendar, reply)</text>
+</g>
+<!-- Ingest&#45;&gt;Agent -->
+<g id="edge8" class="edge">
+<title>Ingest-&gt;Agent</title>
+<path fill="none" stroke="#78909c" d="M742,-204.26C742,-194.16 742,-181.1 742,-169.45"/>
+<polygon fill="#78909c" stroke="#78909c" points="745.5,-169.5 742,-159.5 738.5,-169.5 745.5,-169.5"/>
+<text xml:space="preserve" text-anchor="middle" x="767.74" y="-178.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">process_email</text>
+</g>
+<!-- Ingest&#45;&gt;Gmail -->
+<g id="edge12" class="edge">
+<title>Ingest-&gt;Gmail</title>
+<path fill="none" stroke="#78909c" d="M683.55,-217.01C600.59,-209.8 444.46,-192.62 315.77,-157.6 232.2,-134.86 210.08,-127.99 135,-84.8 122.51,-77.62 109.78,-68.22 98.99,-59.52"/>
+<polygon fill="#78909c" stroke="#78909c" points="101.54,-57.09 91.61,-53.41 97.08,-62.48 101.54,-57.09"/>
+<text xml:space="preserve" text-anchor="middle" x="338.89" y="-136.9" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">fetch threads</text>
+</g>
+<!-- Ingest&#45;&gt;Supabase -->
+<g id="edge17" class="edge">
+<title>Ingest-&gt;Supabase</title>
+<path fill="none" stroke="#78909c" d="M683.55,-211.73C600.5,-196.5 445.03,-162.45 324,-103.6 300.02,-91.94 275.78,-74.07 257.92,-59.49"/>
+<polygon fill="#78909c" stroke="#78909c" points="260.28,-56.9 250.36,-53.18 255.8,-62.28 260.28,-56.9"/>
+<text xml:space="preserve" text-anchor="middle" x="483.26" y="-136.9" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">upsert emails</text>
+</g>
+<!-- Logs -->
+<g id="node17" class="node">
+<title>Logs</title>
+<path fill="#e0e0e0" stroke="#616161" d="M1076.29,-52C1076.29,-52 965.71,-52 965.71,-52 959.71,-52 953.71,-46 953.71,-40 953.71,-40 953.71,-28 953.71,-28 953.71,-22 959.71,-16 965.71,-16 965.71,-16 1076.29,-16 1076.29,-16 1082.29,-16 1088.29,-22 1088.29,-28 1088.29,-28 1088.29,-40 1088.29,-40 1088.29,-46 1082.29,-52 1076.29,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="1021" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#212121">Logs / WebSocket broadcasts</text>
+</g>
+<!-- Ingest&#45;&gt;Logs -->
+<g id="edge21" class="edge">
+<title>Ingest-&gt;Logs</title>
+<path fill="none" stroke="#78909c" d="M800.63,-215.67C845.66,-210.24 903.23,-200.76 922,-186.4 958.82,-158.24 941.85,-131.07 968,-92.8 975.78,-81.41 985.71,-69.98 994.86,-60.33"/>
+<polygon fill="#78909c" stroke="#78909c" points="997.1,-63.04 1001.57,-53.44 992.09,-58.16 997.1,-63.04"/>
+</g>
+<!-- Agent&#45;&gt;Bandit -->
+<g id="edge10" class="edge">
+<title>Agent-&gt;Bandit</title>
+<path fill="none" stroke="#78909c" d="M753.91,-121.45C760.68,-112.36 769.66,-101.35 779.03,-92.8 783.75,-88.48 785.76,-88.47 791,-84.8 802.8,-76.54 815.58,-67.27 826.84,-58.99"/>
+<polygon fill="#78909c" stroke="#78909c" points="828.71,-61.96 834.67,-53.2 824.55,-56.33 828.71,-61.96"/>
+<text xml:space="preserve" text-anchor="middle" x="838.51" y="-95.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">project suggestion, reward hooks</text>
+</g>
+<!-- BRD_Docx -->
+<g id="node11" class="node">
+<title>BRD_Docx</title>
+<path fill="#c8e6c9" stroke="#388e3c" d="M769.83,-52C769.83,-52 686.17,-52 686.17,-52 680.17,-52 674.17,-46 674.17,-40 674.17,-40 674.17,-28 674.17,-28 674.17,-22 680.17,-16 686.17,-16 686.17,-16 769.83,-16 769.83,-16 775.83,-16 781.83,-22 781.83,-28 781.83,-28 781.83,-40 781.83,-40 781.83,-46 775.83,-52 769.83,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="728" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">BRD DOCX generator</text>
+</g>
+<!-- Agent&#45;&gt;BRD_Docx -->
+<g id="edge9" class="edge">
+<title>Agent-&gt;BRD_Docx</title>
+<path fill="none" stroke="#78909c" d="M708.24,-121.12C702.08,-116.31 696.49,-110.48 692.94,-103.6 685.75,-89.63 692.54,-74.03 702,-61.25"/>
+<polygon fill="#78909c" stroke="#78909c" points="704.58,-63.61 708.23,-53.67 699.18,-59.17 704.58,-63.61"/>
+<text xml:space="preserve" text-anchor="middle" x="724.47" y="-95.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">brd_final -&gt; docx</text>
+</g>
+<!-- Calendar -->
+<g id="node13" class="node">
+<title>Calendar</title>
+<path fill="#e1bee7" stroke="#7b1fa2" d="M637.63,-52C637.63,-52 502.37,-52 502.37,-52 496.37,-52 490.37,-46 490.37,-40 490.37,-40 490.37,-28 490.37,-28 490.37,-22 496.37,-16 502.37,-16 502.37,-16 637.63,-16 637.63,-16 643.63,-16 649.63,-22 649.63,-28 649.63,-28 649.63,-40 649.63,-40 649.63,-46 643.63,-52 637.63,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="570" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Google Calendar (free/busy, create)</text>
+</g>
+<!-- Agent&#45;&gt;Calendar -->
+<g id="edge14" class="edge">
+<title>Agent-&gt;Calendar</title>
+<path fill="none" stroke="#78909c" d="M674.05,-132.45C650.57,-127.55 625.34,-118.88 606.03,-103.6 593.05,-93.32 584.22,-77.07 578.55,-62.96"/>
+<polygon fill="#78909c" stroke="#78909c" points="581.89,-61.89 575.18,-53.69 575.31,-64.28 581.89,-61.89"/>
+<text xml:space="preserve" text-anchor="middle" x="646.02" y="-95.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">find slot / create event</text>
+</g>
+<!-- Agent&#45;&gt;Supabase -->
+<g id="edge16" class="edge">
+<title>Agent-&gt;Supabase</title>
+<path fill="none" stroke="#78909c" d="M674.13,-135.9C579.01,-131.53 411.16,-121.54 353.01,-103.6 320.56,-93.59 287.12,-74.25 263.31,-58.66"/>
+<polygon fill="#78909c" stroke="#78909c" points="265.56,-55.95 255.31,-53.3 261.67,-61.77 265.56,-55.95"/>
+<text xml:space="preserve" text-anchor="middle" x="393.5" y="-95.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">save BRD, link emails</text>
+</g>
+<!-- LLM -->
+<g id="node15" class="node">
+<title>LLM</title>
+<path fill="#e1bee7" stroke="#7b1fa2" d="M460.27,-52C460.27,-52 345.73,-52 345.73,-52 339.73,-52 333.73,-46 333.73,-40 333.73,-40 333.73,-28 333.73,-28 333.73,-22 339.73,-16 345.73,-16 345.73,-16 460.27,-16 460.27,-16 466.27,-16 472.27,-22 472.27,-28 472.27,-28 472.27,-40 472.27,-40 472.27,-46 466.27,-52 460.27,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="403" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Groq LLM + local T5 fallback</text>
+</g>
+<!-- Agent&#45;&gt;LLM -->
+<g id="edge15" class="edge">
+<title>Agent-&gt;LLM</title>
+<path fill="none" stroke="#78909c" d="M674.03,-136.81C599.92,-133.76 487,-125.56 450.54,-103.6 434.76,-94.09 422.93,-77.11 415.02,-62.42"/>
+<polygon fill="#78909c" stroke="#78909c" points="418.22,-61.01 410.62,-53.62 411.96,-64.13 418.22,-61.01"/>
+<text xml:space="preserve" text-anchor="middle" x="521.27" y="-95.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">LLM calls (intent/BRD/calendar/reply)</text>
+</g>
+<!-- Agent&#45;&gt;Logs -->
+<g id="edge20" class="edge">
+<title>Agent-&gt;Logs</title>
+<path fill="none" stroke="#78909c" d="M809.91,-128.52C838.88,-123.01 872.7,-114.94 902,-103.6 932.16,-91.93 963.77,-73.37 986.82,-58.5"/>
+<polygon fill="#78909c" stroke="#78909c" points="988.44,-61.62 994.88,-53.21 984.6,-55.77 988.44,-61.62"/>
+</g>
+<!-- Bandit&#45;&gt;Logs -->
+<g id="edge22" class="edge">
+<title>Bandit-&gt;Logs</title>
+<path fill="none" stroke="#78909c" d="M918.48,-34C926.29,-34 934.09,-34 941.89,-34"/>
+<polygon fill="#78909c" stroke="#78909c" points="941.81,-37.5 951.81,-34 941.81,-30.5 941.81,-37.5"/>
+</g>
+<!-- BRD_File -->
+<g id="node16" class="node">
+<title>BRD_File</title>
+<path fill="#e0e0e0" stroke="#616161" d="M1155.5,-52C1155.5,-52 1118.5,-52 1118.5,-52 1112.5,-52 1106.5,-46 1106.5,-40 1106.5,-40 1106.5,-28 1106.5,-28 1106.5,-22 1112.5,-16 1118.5,-16 1118.5,-16 1155.5,-16 1155.5,-16 1161.5,-16 1167.5,-22 1167.5,-28 1167.5,-28 1167.5,-40 1167.5,-40 1167.5,-46 1161.5,-52 1155.5,-52"/>
+<text xml:space="preserve" text-anchor="middle" x="1137" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#212121">BRD .docx</text>
+</g>
+<!-- BRD_Docx&#45;&gt;BRD_File -->
+<g id="edge19" class="edge">
+<title>BRD_Docx-&gt;BRD_File</title>
+<path fill="none" stroke="#78909c" d="M740.65,-52.48C753.39,-69.31 774.75,-93.03 800,-103.2 829.68,-115.15 1059.58,-117.9 1088,-103.2 1104.68,-94.57 1116.9,-77.36 1124.97,-62.26"/>
+<polygon fill="#78909c" stroke="#78909c" points="1127.94,-64.15 1129.22,-53.64 1121.66,-61.06 1127.94,-64.15"/>
+</g>
+<!-- BRD_File&#45;&gt;FE_Projects -->
+<g id="edge24" class="edge">
+<title>BRD_File-&gt;FE_Projects</title>
+<path fill="none" stroke="#78909c" d="M1149.77,-52.34C1163.08,-72.15 1182,-106.05 1182,-138.6 1182,-306.2 1182,-306.2 1182,-306.2 1182,-343.41 1166.41,-356.51 1134,-374.8 1105.29,-391 1018.09,-377.25 986,-384.8 981.73,-385.8 977.38,-387.08 973.07,-388.52"/>
+<polygon fill="#78909c" stroke="#78909c" points="972.11,-385.14 963.92,-391.86 974.51,-391.72 972.11,-385.14"/>
+<text xml:space="preserve" text-anchor="middle" x="1207.87" y="-219.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">download link</text>
+</g>
+<!-- Logs&#45;&gt;FE_Dashboard -->
+<g id="edge23" class="edge">
+<title>Logs-&gt;FE_Dashboard</title>
+<path fill="none" stroke="#78909c" d="M1010.14,-52.22C998.6,-72.2 982,-106.51 982,-138.6 982,-306.2 982,-306.2 982,-306.2 982,-337.84 987.03,-354.22 963,-374.8 948.39,-387.31 895.59,-379.83 877,-384.8 873.23,-385.81 869.39,-387.02 865.57,-388.36"/>
+<polygon fill="#78909c" stroke="#78909c" points="864.45,-385.04 856.35,-391.86 866.94,-391.58 864.45,-385.04"/>
+<text xml:space="preserve" text-anchor="middle" x="1015.36" y="-219.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#37474f">WebSocket events</text>
+</g>
+</g>
+</svg>
