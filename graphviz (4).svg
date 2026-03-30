@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="425pt" height="392pt" viewBox="0.00 0.00 425.00 392.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 388.45)">
+<title>BanditRL</title>
+<polygon fill="#ffffff" stroke="none" points="-4,4 -4,-388.45 421.22,-388.45 421.22,4 -4,4"/>
+<!-- Email -->
+<g id="node1" class="node">
+<title>Email</title>
+<ellipse fill="#fff3e0" stroke="#f57c00" stroke-width="2" cx="203.54" cy="-361.83" rx="58.04" ry="22.63"/>
+<text xml:space="preserve" text-anchor="middle" x="203.54" y="-364.83" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">Incoming email</text>
+<text xml:space="preserve" text-anchor="middle" x="203.54" y="-352.83" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">(intent, features)</text>
+</g>
+<!-- Heuristic -->
+<g id="node2" class="node">
+<title>Heuristic</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M351.19,-292.4C351.19,-292.4 245.89,-292.4 245.89,-292.4 239.89,-292.4 233.89,-286.4 233.89,-280.4 233.89,-280.4 233.89,-268.4 233.89,-268.4 233.89,-262.4 239.89,-256.4 245.89,-256.4 245.89,-256.4 351.19,-256.4 351.19,-256.4 357.19,-256.4 363.19,-262.4 363.19,-268.4 363.19,-268.4 363.19,-280.4 363.19,-280.4 363.19,-286.4 357.19,-292.4 351.19,-292.4"/>
+<text xml:space="preserve" text-anchor="middle" x="298.54" y="-277.4" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">Heuristic matcher</text>
+<text xml:space="preserve" text-anchor="middle" x="298.54" y="-265.4" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">(suggest_project_for_email)</text>
+</g>
+<!-- Email&#45;&gt;Heuristic -->
+<g id="edge1" class="edge">
+<title>Email-&gt;Heuristic</title>
+<path fill="none" stroke="#78909c" d="M226.54,-340.15C239.91,-328.13 256.84,-312.9 270.93,-300.23"/>
+<polygon fill="#78909c" stroke="#78909c" points="273.05,-303.02 278.15,-293.73 268.37,-297.82 273.05,-303.02"/>
+<text xml:space="preserve" text-anchor="middle" x="273.79" y="-313.1" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">features</text>
+</g>
+<!-- Bandit -->
+<g id="node3" class="node">
+<title>Bandit</title>
+<path fill="#e8f5e9" stroke="#388e3c" stroke-width="1.5" d="M232.35,-209.6C232.35,-209.6 174.73,-209.6 174.73,-209.6 168.73,-209.6 162.73,-203.6 162.73,-197.6 162.73,-197.6 162.73,-185.6 162.73,-185.6 162.73,-179.6 168.73,-173.6 174.73,-173.6 174.73,-173.6 232.35,-173.6 232.35,-173.6 238.35,-173.6 244.35,-179.6 244.35,-185.6 244.35,-185.6 244.35,-197.6 244.35,-197.6 244.35,-203.6 238.35,-209.6 232.35,-209.6"/>
+<text xml:space="preserve" text-anchor="middle" x="203.54" y="-194.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">Bandit policy</text>
+<text xml:space="preserve" text-anchor="middle" x="203.54" y="-182.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">ε-greedy + prior</text>
+</g>
+<!-- Email&#45;&gt;Bandit -->
+<g id="edge2" class="edge">
+<title>Email-&gt;Bandit</title>
+<path fill="none" stroke="#78909c" d="M200.46,-338.38C198.79,-325.05 196.9,-307.79 196.06,-292.4 195.19,-276.42 195.12,-272.37 196.06,-256.4 196.73,-244.87 198.08,-232.23 199.46,-221.26"/>
+<polygon fill="#78909c" stroke="#78909c" points="202.89,-222.03 200.72,-211.65 195.95,-221.11 202.89,-222.03"/>
+<text xml:space="preserve" text-anchor="middle" x="210.3" y="-271.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">features</text>
+</g>
+<!-- Heuristic&#45;&gt;Bandit -->
+<g id="edge3" class="edge">
+<title>Heuristic-&gt;Bandit</title>
+<path fill="none" stroke="#78909c" d="M278.39,-256.26C265.22,-245.06 247.8,-230.24 233.07,-217.72"/>
+<polygon fill="#78909c" stroke="#78909c" points="235.35,-215.06 225.47,-211.25 230.82,-220.4 235.35,-215.06"/>
+<text xml:space="preserve" text-anchor="middle" x="276.35" y="-230.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">prior boost</text>
+</g>
+<!-- Projects -->
+<g id="node4" class="node">
+<title>Projects</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M69.08,-126.8C69.08,-126.8 12,-126.8 12,-126.8 6,-126.8 0,-120.8 0,-114.8 0,-114.8 0,-102.8 0,-102.8 0,-96.8 6,-90.8 12,-90.8 12,-90.8 69.08,-90.8 69.08,-90.8 75.08,-90.8 81.08,-96.8 81.08,-102.8 81.08,-102.8 81.08,-114.8 81.08,-114.8 81.08,-120.8 75.08,-126.8 69.08,-126.8"/>
+<text xml:space="preserve" text-anchor="middle" x="40.54" y="-105.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">Arms = Projects</text>
+</g>
+<!-- Bandit&#45;&gt;Projects -->
+<g id="edge4" class="edge">
+<title>Bandit-&gt;Projects</title>
+<path fill="none" stroke="#78909c" d="M162.11,-173.57C149.38,-168.09 135.41,-161.82 122.81,-155.6 108.67,-148.62 93.51,-140.4 80.11,-132.87"/>
+<polygon fill="#78909c" stroke="#78909c" points="81.99,-129.91 71.56,-128.02 78.53,-136 81.99,-129.91"/>
+<text xml:space="preserve" text-anchor="middle" x="142.17" y="-147.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">score arms</text>
+</g>
+<!-- Action -->
+<g id="node5" class="node">
+<title>Action</title>
+<path fill="#e0f7fa" stroke="#0097a7" d="M298.64,-126.8C298.64,-126.8 224.44,-126.8 224.44,-126.8 218.44,-126.8 212.44,-120.8 212.44,-114.8 212.44,-114.8 212.44,-102.8 212.44,-102.8 212.44,-96.8 218.44,-90.8 224.44,-90.8 224.44,-90.8 298.64,-90.8 298.64,-90.8 304.64,-90.8 310.64,-96.8 310.64,-102.8 310.64,-102.8 310.64,-114.8 310.64,-114.8 310.64,-120.8 304.64,-126.8 298.64,-126.8"/>
+<text xml:space="preserve" text-anchor="middle" x="261.54" y="-111.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">Chosen project</text>
+<text xml:space="preserve" text-anchor="middle" x="261.54" y="-99.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#006064">(project_suggestion)</text>
+</g>
+<!-- Bandit&#45;&gt;Action -->
+<g id="edge5" class="edge">
+<title>Bandit-&gt;Action</title>
+<path fill="none" stroke="#78909c" d="M216.12,-173.07C223.8,-162.37 233.77,-148.49 242.4,-136.46"/>
+<polygon fill="#78909c" stroke="#78909c" points="245.11,-138.69 248.1,-128.53 239.42,-134.61 245.11,-138.69"/>
+<text xml:space="preserve" text-anchor="middle" x="254.38" y="-147.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">select arm</text>
+</g>
+<!-- State -->
+<g id="node8" class="node">
+<title>State</title>
+<path fill="#eceff1" stroke="#b0bec5" d="M181.98,-126.8C181.98,-126.8 111.1,-126.8 111.1,-126.8 105.1,-126.8 99.1,-120.8 99.1,-114.8 99.1,-114.8 99.1,-102.8 99.1,-102.8 99.1,-96.8 105.1,-90.8 111.1,-90.8 111.1,-90.8 181.98,-90.8 181.98,-90.8 187.98,-90.8 193.98,-96.8 193.98,-102.8 193.98,-102.8 193.98,-114.8 193.98,-114.8 193.98,-120.8 187.98,-126.8 181.98,-126.8"/>
+<text xml:space="preserve" text-anchor="middle" x="146.54" y="-111.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#263238">Bandit state/log</text>
+<text xml:space="preserve" text-anchor="middle" x="146.54" y="-99.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#263238">wins, plays, epsilon</text>
+</g>
+<!-- Bandit&#45;&gt;State -->
+<g id="edge9" class="edge">
+<title>Bandit-&gt;State</title>
+<path fill="none" stroke="#78909c" d="M186.54,-173.06C181.69,-167.66 176.56,-161.56 172.3,-155.6 168.05,-149.66 163.94,-142.95 160.3,-136.54"/>
+<polygon fill="#78909c" stroke="#78909c" points="163.6,-135.29 155.73,-128.19 157.46,-138.65 163.6,-135.29"/>
+<text xml:space="preserve" text-anchor="middle" x="193.42" y="-147.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">update stats</text>
+</g>
+<!-- UI -->
+<g id="node6" class="node">
+<title>UI</title>
+<path fill="#e3f2fd" stroke="#1976d2" d="M265.94,-40C265.94,-40 173.14,-40 173.14,-40 167.14,-40 161.14,-34 161.14,-28 161.14,-28 161.14,-16 161.14,-16 161.14,-10 167.14,-4 173.14,-4 173.14,-4 265.94,-4 265.94,-4 271.94,-4 277.94,-10 277.94,-16 277.94,-16 277.94,-28 277.94,-28 277.94,-34 271.94,-40 265.94,-40"/>
+<text xml:space="preserve" text-anchor="middle" x="219.54" y="-25" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">UI</text>
+<text xml:space="preserve" text-anchor="middle" x="219.54" y="-13" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">(Dashboard/Bandit page)</text>
+</g>
+<!-- Action&#45;&gt;UI -->
+<g id="edge6" class="edge">
+<title>Action-&gt;UI</title>
+<path fill="none" stroke="#78909c" d="M234.78,-90.47C229.17,-85.49 223.99,-79.54 220.79,-72.8 217.75,-66.39 216.53,-58.98 216.27,-51.87"/>
+<polygon fill="#78909c" stroke="#78909c" points="219.77,-52.01 216.56,-41.91 212.77,-51.81 219.77,-52.01"/>
+<text xml:space="preserve" text-anchor="middle" x="254.16" y="-64.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">display suggestion</text>
+</g>
+<!-- RewardEvt -->
+<g id="node7" class="node">
+<title>RewardEvt</title>
+<path fill="#fff9c4" stroke="#fbc02d" d="M405.22,-44C405.22,-44 321.86,-44 321.86,-44 315.86,-44 309.86,-38 309.86,-32 309.86,-32 309.86,-12 309.86,-12 309.86,-6 315.86,0 321.86,0 321.86,0 405.22,0 405.22,0 411.22,0 417.22,-6 417.22,-12 417.22,-12 417.22,-32 417.22,-32 417.22,-38 411.22,-44 405.22,-44"/>
+<text xml:space="preserve" text-anchor="middle" x="363.54" y="-31" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">Reward events</text>
+<text xml:space="preserve" text-anchor="middle" x="363.54" y="-19" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">(assign, approve, send,</text>
+<text xml:space="preserve" text-anchor="middle" x="363.54" y="-7" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">manual feedback)</text>
+</g>
+<!-- Action&#45;&gt;RewardEvt -->
+<g id="edge7" class="edge">
+<title>Action-&gt;RewardEvt</title>
+<path fill="none" stroke="#78909c" d="M279.35,-90.34C288.53,-81.57 300.03,-70.95 310.81,-62 315.13,-58.41 319.75,-54.75 324.39,-51.19"/>
+<polygon fill="#78909c" stroke="#78909c" points="326.17,-54.23 332.05,-45.41 321.96,-48.64 326.17,-54.23"/>
+<text xml:space="preserve" text-anchor="middle" x="337.17" y="-64.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">later outcomes</text>
+</g>
+<!-- RewardEvt&#45;&gt;Bandit -->
+<g id="edge8" class="edge">
+<title>RewardEvt-&gt;Bandit</title>
+<path fill="none" stroke="#fbc02d" stroke-width="2" d="M366.65,-44.37C367.18,-53.39 366.73,-63.84 363.54,-72.8 353.16,-101.97 342.43,-105.96 319.54,-126.8 300.77,-143.89 276.61,-158.11 255.2,-168.75"/>
+<polygon fill="#fbc02d" stroke="#fbc02d" stroke-width="2" points="255.17,-164.88 247.68,-172.37 258.2,-171.19 255.17,-164.88"/>
+<text xml:space="preserve" text-anchor="middle" x="382.3" y="-106.1" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#f57f17">reward/penalty</text>
+</g>
+<!-- State&#45;&gt;UI -->
+<g id="edge11" class="edge">
+<title>State-&gt;UI</title>
+<path fill="none" stroke="#78909c" d="M150.19,-90.45C152.75,-81.31 156.88,-70.31 163.3,-62 167.54,-56.51 172.78,-51.49 178.33,-47.02"/>
+<polygon fill="#78909c" stroke="#78909c" points="180.04,-50.11 186,-41.35 175.88,-44.48 180.04,-50.11"/>
+<text xml:space="preserve" text-anchor="middle" x="188.42" y="-64.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">state/log view</text>
+</g>
+<!-- Store -->
+<g id="node9" class="node">
+<title>Store</title>
+<path fill="#f3e5f5" stroke="#8e24aa" d="M131.09,-40C131.09,-40 67.99,-40 67.99,-40 61.99,-40 55.99,-34 55.99,-28 55.99,-28 55.99,-16 55.99,-16 55.99,-10 61.99,-4 67.99,-4 67.99,-4 131.09,-4 131.09,-4 137.09,-4 143.09,-10 143.09,-16 143.09,-16 143.09,-28 143.09,-28 143.09,-34 137.09,-40 131.09,-40"/>
+<text xml:space="preserve" text-anchor="middle" x="99.54" y="-25" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Persistence</text>
+<text xml:space="preserve" text-anchor="middle" x="99.54" y="-13" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">(JSON/Supabase)</text>
+</g>
+<!-- State&#45;&gt;Store -->
+<g id="edge10" class="edge">
+<title>State-&gt;Store</title>
+<path fill="none" stroke="#78909c" d="M116.27,-90.61C110.19,-85.67 104.58,-79.72 101.04,-72.8 97.72,-66.31 96.43,-58.69 96.18,-51.4"/>
+<polygon fill="#78909c" stroke="#78909c" points="99.67,-51.66 96.5,-41.55 92.68,-51.43 99.67,-51.66"/>
+<text xml:space="preserve" text-anchor="middle" x="112.79" y="-64.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">persist</text>
+</g>
+</g>
+</svg>

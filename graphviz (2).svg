@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="758pt" height="541pt" viewBox="0.00 0.00 758.00 541.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 536.8)">
+<title>UserFlow</title>
+<polygon fill="#ffffff" stroke="none" points="-4,4 -4,-536.8 754.5,-536.8 754.5,4 -4,4"/>
+<!-- User -->
+<g id="node1" class="node">
+<title>User</title>
+<ellipse fill="#bbdefb" stroke="#1976d2" stroke-width="2" cx="171.29" cy="-514.8" rx="27" ry="18"/>
+<text xml:space="preserve" text-anchor="middle" x="171.29" y="-511.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">User</text>
+</g>
+<!-- FE -->
+<g id="node2" class="node">
+<title>FE</title>
+<path fill="#e3f2fd" stroke="#1976d2" d="M158.73,-450C158.73,-450 47.86,-450 47.86,-450 41.86,-450 35.86,-444 35.86,-438 35.86,-438 35.86,-426 35.86,-426 35.86,-420 41.86,-414 47.86,-414 47.86,-414 158.73,-414 158.73,-414 164.73,-414 170.73,-420 170.73,-426 170.73,-426 170.73,-438 170.73,-438 170.73,-444 164.73,-450 158.73,-450"/>
+<text xml:space="preserve" text-anchor="middle" x="103.29" y="-435" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">Frontend</text>
+<text xml:space="preserve" text-anchor="middle" x="103.29" y="-423" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#0d47a1">(Dashboard/Actions/Projects)</text>
+</g>
+<!-- User&#45;&gt;FE -->
+<g id="edge1" class="edge">
+<title>User-&gt;FE</title>
+<path fill="none" stroke="#78909c" d="M154.42,-500C147.42,-493.88 139.47,-486.35 133.07,-478.8 128.16,-473.01 123.41,-466.36 119.2,-459.95"/>
+<polygon fill="#78909c" stroke="#78909c" points="122.18,-458.12 113.89,-451.53 116.26,-461.86 122.18,-458.12"/>
+<text xml:space="preserve" text-anchor="middle" x="171.18" y="-470.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">view actions/projects</text>
+</g>
+<!-- Ext -->
+<g id="node3" class="node">
+<title>Ext</title>
+<path fill="#fff3e0" stroke="#f57c00" d="M284.44,-450C284.44,-450 204.15,-450 204.15,-450 198.15,-450 192.15,-444 192.15,-438 192.15,-438 192.15,-426 192.15,-426 192.15,-420 198.15,-414 204.15,-414 204.15,-414 284.44,-414 284.44,-414 290.44,-414 296.44,-420 296.44,-426 296.44,-426 296.44,-438 296.44,-438 296.44,-444 290.44,-450 284.44,-450"/>
+<text xml:space="preserve" text-anchor="middle" x="244.29" y="-435" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">Chrome Extension</text>
+<text xml:space="preserve" text-anchor="middle" x="244.29" y="-423" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#e65100">(popup/scrape/record)</text>
+</g>
+<!-- User&#45;&gt;Ext -->
+<g id="edge2" class="edge">
+<title>User-&gt;Ext</title>
+<path fill="none" stroke="#78909c" d="M187.79,-499.75C194.69,-493.58 202.65,-486.09 209.29,-478.8 214.95,-472.6 220.66,-465.54 225.78,-458.86"/>
+<polygon fill="#78909c" stroke="#78909c" points="228.24,-461.41 231.42,-451.31 222.63,-457.22 228.24,-461.41"/>
+<text xml:space="preserve" text-anchor="middle" x="256.42" y="-470.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">upload notes / scrape</text>
+</g>
+<!-- API -->
+<g id="node4" class="node">
+<title>API</title>
+<path fill="#e8f5e9" stroke="#388e3c" d="M268.43,-367.2C268.43,-367.2 226.16,-367.2 226.16,-367.2 220.16,-367.2 214.16,-361.2 214.16,-355.2 214.16,-355.2 214.16,-343.2 214.16,-343.2 214.16,-337.2 220.16,-331.2 226.16,-331.2 226.16,-331.2 268.43,-331.2 268.43,-331.2 274.43,-331.2 280.43,-337.2 280.43,-343.2 280.43,-343.2 280.43,-355.2 280.43,-355.2 280.43,-361.2 274.43,-367.2 268.43,-367.2"/>
+<text xml:space="preserve" text-anchor="middle" x="247.29" y="-346.2" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">FastAPI /api</text>
+</g>
+<!-- FE&#45;&gt;API -->
+<g id="edge3" class="edge">
+<title>FE-&gt;API</title>
+<path fill="none" stroke="#78909c" d="M116.78,-413.85C125.03,-404.32 136.29,-392.87 148.33,-385.2 164.93,-374.63 185.13,-366.75 202.95,-361.18"/>
+<polygon fill="#78909c" stroke="#78909c" points="203.91,-364.54 212.51,-358.35 201.92,-357.83 203.91,-364.54"/>
+<text xml:space="preserve" text-anchor="middle" x="194.81" y="-387.9" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">approve, assign, feedback</text>
+</g>
+<!-- Ext&#45;&gt;API -->
+<g id="edge4" class="edge">
+<title>Ext-&gt;API</title>
+<path fill="none" stroke="#78909c" d="M244.93,-413.86C245.31,-403.76 245.79,-390.7 246.22,-379.05"/>
+<polygon fill="#78909c" stroke="#78909c" points="249.72,-379.22 246.59,-369.1 242.72,-378.97 249.72,-379.22"/>
+<text xml:space="preserve" text-anchor="middle" x="282.09" y="-387.9" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">send transcripts/text</text>
+</g>
+<!-- Ingest -->
+<g id="node5" class="node">
+<title>Ingest</title>
+<path fill="#e8f5e9" stroke="#388e3c" d="M452.86,-284.4C452.86,-284.4 357.73,-284.4 357.73,-284.4 351.73,-284.4 345.73,-278.4 345.73,-272.4 345.73,-272.4 345.73,-260.4 345.73,-260.4 345.73,-254.4 351.73,-248.4 357.73,-248.4 357.73,-248.4 452.86,-248.4 452.86,-248.4 458.86,-248.4 464.86,-254.4 464.86,-260.4 464.86,-260.4 464.86,-272.4 464.86,-272.4 464.86,-278.4 458.86,-284.4 452.86,-284.4"/>
+<text xml:space="preserve" text-anchor="middle" x="405.29" y="-263.4" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">Email Ingest + Clustering</text>
+</g>
+<!-- API&#45;&gt;Ingest -->
+<g id="edge5" class="edge">
+<title>API-&gt;Ingest</title>
+<path fill="none" stroke="#78909c" d="M280.8,-331.06C304.21,-319.09 335.7,-302.99 361.15,-289.97"/>
+<polygon fill="#78909c" stroke="#78909c" points="362.63,-293.15 369.94,-285.48 359.45,-286.92 362.63,-293.15"/>
+<text xml:space="preserve" text-anchor="middle" x="371.62" y="-305.1" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">new emails / cluster</text>
+</g>
+<!-- Bandit -->
+<g id="node7" class="node">
+<title>Bandit</title>
+<path fill="#e8f5e9" stroke="#388e3c" d="M248.34,-118.8C248.34,-118.8 138.24,-118.8 138.24,-118.8 132.24,-118.8 126.24,-112.8 126.24,-106.8 126.24,-106.8 126.24,-94.8 126.24,-94.8 126.24,-88.8 132.24,-82.8 138.24,-82.8 138.24,-82.8 248.34,-82.8 248.34,-82.8 254.34,-82.8 260.34,-88.8 260.34,-94.8 260.34,-94.8 260.34,-106.8 260.34,-106.8 260.34,-112.8 254.34,-118.8 248.34,-118.8"/>
+<text xml:space="preserve" text-anchor="middle" x="193.29" y="-103.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">Bandit Router</text>
+<text xml:space="preserve" text-anchor="middle" x="193.29" y="-91.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">(project suggestion + reward)</text>
+</g>
+<!-- API&#45;&gt;Bandit -->
+<g id="edge12" class="edge">
+<title>API-&gt;Bandit</title>
+<path fill="none" stroke="#78909c" d="M243.5,-330.87C234.3,-288.9 210.75,-181.46 199.48,-130.05"/>
+<polygon fill="#78909c" stroke="#78909c" points="202.97,-129.6 197.41,-120.59 196.13,-131.1 202.97,-129.6"/>
+<text xml:space="preserve" text-anchor="middle" x="262.27" y="-222.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">manual reward/penalty</text>
+</g>
+<!-- Supa -->
+<g id="node11" class="node">
+<title>Supa</title>
+<path fill="#f3e5f5" stroke="#8e24aa" d="M711.78,-118.8C711.78,-118.8 604.81,-118.8 604.81,-118.8 598.81,-118.8 592.81,-112.8 592.81,-106.8 592.81,-106.8 592.81,-94.8 592.81,-94.8 592.81,-88.8 598.81,-82.8 604.81,-82.8 604.81,-82.8 711.78,-82.8 711.78,-82.8 717.78,-82.8 723.78,-88.8 723.78,-94.8 723.78,-94.8 723.78,-106.8 723.78,-106.8 723.78,-112.8 717.78,-118.8 711.78,-118.8"/>
+<text xml:space="preserve" text-anchor="middle" x="658.29" y="-103.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Supabase</text>
+<text xml:space="preserve" text-anchor="middle" x="658.29" y="-91.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">(projects, emails, docs, brds)</text>
+</g>
+<!-- API&#45;&gt;Supa -->
+<g id="edge15" class="edge">
+<title>API-&gt;Supa</title>
+<path fill="none" stroke="#78909c" d="M280.92,-348.94C364.93,-348.69 583.54,-334.76 671.29,-201.6 685.23,-180.45 679.22,-151.26 671.38,-129.91"/>
+<polygon fill="#78909c" stroke="#78909c" points="674.63,-128.62 667.65,-120.65 668.14,-131.24 674.63,-128.62"/>
+<text xml:space="preserve" text-anchor="middle" x="704.13" y="-222.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">projects/docs/brds CRUD</text>
+</g>
+<!-- Agent -->
+<g id="node6" class="node">
+<title>Agent</title>
+<path fill="#e8f5e9" stroke="#388e3c" d="M461,-201.6C461,-201.6 349.59,-201.6 349.59,-201.6 343.59,-201.6 337.59,-195.6 337.59,-189.6 337.59,-189.6 337.59,-177.6 337.59,-177.6 337.59,-171.6 343.59,-165.6 349.59,-165.6 349.59,-165.6 461,-165.6 461,-165.6 467,-165.6 473,-171.6 473,-177.6 473,-177.6 473,-189.6 473,-189.6 473,-195.6 467,-201.6 461,-201.6"/>
+<text xml:space="preserve" text-anchor="middle" x="405.29" y="-186.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">LangGraph Agent</text>
+<text xml:space="preserve" text-anchor="middle" x="405.29" y="-174.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">(intent, BRD, calendar, reply)</text>
+</g>
+<!-- Ingest&#45;&gt;Agent -->
+<g id="edge6" class="edge">
+<title>Ingest-&gt;Agent</title>
+<path fill="none" stroke="#78909c" d="M405.29,-248.26C405.29,-238.16 405.29,-225.1 405.29,-213.45"/>
+<polygon fill="#78909c" stroke="#78909c" points="408.79,-213.5 405.29,-203.5 401.79,-213.5 408.79,-213.5"/>
+<text xml:space="preserve" text-anchor="middle" x="431.04" y="-222.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">process_email</text>
+</g>
+<!-- Ingest&#45;&gt;Supa -->
+<g id="edge14" class="edge">
+<title>Ingest-&gt;Supa</title>
+<path fill="none" stroke="#78909c" d="M465.19,-248.38C517.35,-230.8 591.84,-198.66 639.29,-147.6 644.02,-142.51 647.66,-136.08 650.42,-129.65"/>
+<polygon fill="#78909c" stroke="#78909c" points="653.62,-131.11 653.76,-120.51 647.04,-128.7 653.62,-131.11"/>
+<text xml:space="preserve" text-anchor="middle" x="643.41" y="-180.9" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">upsert emails</text>
+</g>
+<!-- Agent&#45;&gt;Bandit -->
+<g id="edge7" class="edge">
+<title>Agent-&gt;Bandit</title>
+<path fill="none" stroke="#78909c" d="M337.18,-178.92C304.03,-174.67 264.67,-165.83 233.32,-147.6 224.79,-142.64 217.16,-135.2 210.9,-127.75"/>
+<polygon fill="#78909c" stroke="#78909c" points="214.04,-126.09 205.14,-120.34 208.52,-130.39 214.04,-126.09"/>
+<text xml:space="preserve" text-anchor="middle" x="288.31" y="-139.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">suggest project / reward hooks</text>
+</g>
+<!-- BRDGen -->
+<g id="node8" class="node">
+<title>BRDGen</title>
+<path fill="#e8f5e9" stroke="#388e3c" d="M563.23,-118.8C563.23,-118.8 477.36,-118.8 477.36,-118.8 471.36,-118.8 465.36,-112.8 465.36,-106.8 465.36,-106.8 465.36,-94.8 465.36,-94.8 465.36,-88.8 471.36,-82.8 477.36,-82.8 477.36,-82.8 563.23,-82.8 563.23,-82.8 569.23,-82.8 575.23,-88.8 575.23,-94.8 575.23,-94.8 575.23,-106.8 575.23,-106.8 575.23,-112.8 569.23,-118.8 563.23,-118.8"/>
+<text xml:space="preserve" text-anchor="middle" x="520.29" y="-97.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#1b5e20">BRD DOCX Generator</text>
+</g>
+<!-- Agent&#45;&gt;BRDGen -->
+<g id="edge8" class="edge">
+<title>Agent-&gt;BRDGen</title>
+<path fill="none" stroke="#78909c" d="M429.96,-165.27C446.49,-153.66 468.45,-138.23 486.58,-125.49"/>
+<polygon fill="#78909c" stroke="#78909c" points="488.26,-128.59 494.43,-119.98 484.23,-122.86 488.26,-128.59"/>
+<text xml:space="preserve" text-anchor="middle" x="501.21" y="-139.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">brd_final -&gt; docx</text>
+</g>
+<!-- Gmail -->
+<g id="node9" class="node">
+<title>Gmail</title>
+<path fill="#f3e5f5" stroke="#8e24aa" d="M333.1,-118.8C333.1,-118.8 297.49,-118.8 297.49,-118.8 291.49,-118.8 285.49,-112.8 285.49,-106.8 285.49,-106.8 285.49,-94.8 285.49,-94.8 285.49,-88.8 291.49,-82.8 297.49,-82.8 297.49,-82.8 333.1,-82.8 333.1,-82.8 339.1,-82.8 345.1,-88.8 345.1,-94.8 345.1,-94.8 345.1,-106.8 345.1,-106.8 345.1,-112.8 339.1,-118.8 333.1,-118.8"/>
+<text xml:space="preserve" text-anchor="middle" x="315.29" y="-97.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Gmail API</text>
+</g>
+<!-- Agent&#45;&gt;Gmail -->
+<g id="edge9" class="edge">
+<title>Agent-&gt;Gmail</title>
+<path fill="none" stroke="#78909c" d="M380.41,-165.2C373.16,-159.8 365.37,-153.67 358.56,-147.6 351.56,-141.35 344.39,-134.15 337.95,-127.34"/>
+<polygon fill="#78909c" stroke="#78909c" points="340.64,-125.09 331.29,-120.12 335.5,-129.84 340.64,-125.09"/>
+<text xml:space="preserve" text-anchor="middle" x="379.93" y="-139.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">send replies</text>
+</g>
+<!-- GCal -->
+<g id="node10" class="node">
+<title>GCal</title>
+<path fill="#f3e5f5" stroke="#8e24aa" d="M435.31,-118.8C435.31,-118.8 375.28,-118.8 375.28,-118.8 369.28,-118.8 363.28,-112.8 363.28,-106.8 363.28,-106.8 363.28,-94.8 363.28,-94.8 363.28,-88.8 369.28,-82.8 375.28,-82.8 375.28,-82.8 435.31,-82.8 435.31,-82.8 441.31,-82.8 447.31,-88.8 447.31,-94.8 447.31,-94.8 447.31,-106.8 447.31,-106.8 447.31,-112.8 441.31,-118.8 435.31,-118.8"/>
+<text xml:space="preserve" text-anchor="middle" x="405.29" y="-97.8" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#4a148c">Google Calendar</text>
+</g>
+<!-- Agent&#45;&gt;GCal -->
+<g id="edge10" class="edge">
+<title>Agent-&gt;GCal</title>
+<path fill="none" stroke="#78909c" d="M405.29,-165.46C405.29,-155.36 405.29,-142.3 405.29,-130.65"/>
+<polygon fill="#78909c" stroke="#78909c" points="408.79,-130.7 405.29,-120.7 401.79,-130.7 408.79,-130.7"/>
+<text xml:space="preserve" text-anchor="middle" x="426.9" y="-139.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">create event</text>
+</g>
+<!-- Agent&#45;&gt;Supa -->
+<g id="edge11" class="edge">
+<title>Agent-&gt;Supa</title>
+<path fill="none" stroke="#78909c" d="M473.47,-166.66C493.61,-161.3 515.54,-154.83 535.29,-147.6 545.9,-143.72 547.85,-141.07 558.3,-136.8 569.96,-132.04 582.53,-127.32 594.69,-122.97"/>
+<polygon fill="#78909c" stroke="#78909c" points="595.55,-126.37 603.82,-119.74 593.22,-119.77 595.55,-126.37"/>
+<text xml:space="preserve" text-anchor="middle" x="598.8" y="-139.5" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">save BRD, link emails</text>
+</g>
+<!-- WS -->
+<g id="node12" class="node">
+<title>WS</title>
+<path fill="#eceff1" stroke="#b0bec5" d="M102.59,-36C102.59,-36 12,-36 12,-36 6,-36 0,-30 0,-24 0,-24 0,-12 0,-12 0,-6 6,0 12,0 12,0 102.59,0 102.59,0 108.59,0 114.59,-6 114.59,-12 114.59,-12 114.59,-24 114.59,-24 114.59,-30 108.59,-36 102.59,-36"/>
+<text xml:space="preserve" text-anchor="middle" x="57.29" y="-15" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#263238">WebSocket Events/Logs</text>
+</g>
+<!-- Bandit&#45;&gt;WS -->
+<g id="edge13" class="edge">
+<title>Bandit-&gt;WS</title>
+<path fill="none" stroke="#78909c" d="M164.12,-82.47C144.31,-70.7 117.89,-55 96.28,-42.16"/>
+<polygon fill="#78909c" stroke="#78909c" points="98.11,-39.18 87.72,-37.08 94.53,-45.19 98.11,-39.18"/>
+<text xml:space="preserve" text-anchor="middle" x="163.55" y="-56.7" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">state/log updates</text>
+</g>
+<!-- BRDFile -->
+<g id="node13" class="node">
+<title>BRDFile</title>
+<path fill="#eceff1" stroke="#b0bec5" d="M202.79,-36C202.79,-36 165.79,-36 165.79,-36 159.79,-36 153.79,-30 153.79,-24 153.79,-24 153.79,-12 153.79,-12 153.79,-6 159.79,0 165.79,0 165.79,0 202.79,0 202.79,0 208.79,0 214.79,-6 214.79,-12 214.79,-12 214.79,-24 214.79,-24 214.79,-30 208.79,-36 202.79,-36"/>
+<text xml:space="preserve" text-anchor="middle" x="184.29" y="-15" font-family="Helvetica,Arial,sans-serif" font-size="10.00" fill="#263238">BRD .docx</text>
+</g>
+<!-- BRDGen&#45;&gt;BRDFile -->
+<g id="edge16" class="edge">
+<title>BRDGen-&gt;BRDFile</title>
+<path fill="none" stroke="#78909c" d="M465.16,-85.05C462.17,-84.28 459.19,-83.53 456.29,-82.8 374.97,-62.47 279.49,-40.51 226.03,-28.39"/>
+<polygon fill="#78909c" stroke="#78909c" points="226.96,-25.01 216.43,-26.22 225.42,-31.84 226.96,-25.01"/>
+</g>
+<!-- WS&#45;&gt;FE -->
+<g id="edge18" class="edge">
+<title>WS-&gt;FE</title>
+<path fill="none" stroke="#78909c" d="M41.77,-36.21C29.45,-51.69 14.29,-75.65 14.29,-99.8 14.29,-350.2 14.29,-350.2 14.29,-350.2 14.29,-374.97 33.43,-394.14 53.95,-407.58"/>
+<polygon fill="#78909c" stroke="#78909c" points="52.08,-410.54 62.45,-412.75 55.72,-404.56 52.08,-410.54"/>
+<text xml:space="preserve" text-anchor="middle" x="44.67" y="-222.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">live updates/logs</text>
+</g>
+<!-- BRDFile&#45;&gt;FE -->
+<g id="edge17" class="edge">
+<title>BRDFile-&gt;FE</title>
+<path fill="none" stroke="#78909c" d="M153.55,-28.01C139.57,-33.5 123.83,-41.86 113.29,-54 99.26,-70.18 98.29,-78.38 98.29,-99.8 98.29,-350.2 98.29,-350.2 98.29,-350.2 98.29,-367.5 99.45,-386.84 100.65,-402.27"/>
+<polygon fill="#78909c" stroke="#78909c" points="97.16,-402.5 101.48,-412.17 104.13,-401.92 97.16,-402.5"/>
+<text xml:space="preserve" text-anchor="middle" x="124.17" y="-222.3" font-family="Helvetica,Arial,sans-serif" font-size="9.00" fill="#455a64">download link</text>
+</g>
+</g>
+</svg>
