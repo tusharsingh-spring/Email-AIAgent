@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom' // <-- 1. Import useNavigate
 import { useApp } from '../context/AppContext'
 import {
   getProjects, getProject, deleteProject, getProjectEmails, getProjectDocuments, getProjectContext,
@@ -7,22 +8,17 @@ import {
 } from '../services/api'
 import { 
   FolderPlus, Plus, Download, FileText, Mail, 
-  Cpu, Loader2, Trash2, ChevronDown, Check, Box, LayoutGrid
+  Cpu, Loader2, Trash2, ChevronDown, Check, Box, LayoutGrid, ArrowRight
 } from 'lucide-react'
 import PipelineGraph from '../components/ProjectStudio/PipelineGraph'
-import BRDSectionContent from '../components/ui/BRDSectionContent'
-
-const LABELS = {
-  executive_summary: 'Executive Summary', business_objectives: 'Business Objectives', scope: 'Scope',
-  functional_requirements: 'Functional Requirements', non_functional_requirements: 'Non-Functional Requirements',
-  stakeholders_decisions: 'Stakeholders & Decisions', risks_constraints: 'Risks & Constraints',
-  feature_prioritization: 'Feature Prioritization', timeline_milestones: 'Timeline & Milestones',
-}
 
 export default function Projects() {
+  const navigate = useNavigate() // <-- 2. Initialize the hook
   const { toast = () => {}, state = {} } = useApp() || {}
   const [projects, setProjects] = useState([])
   const [active, setActive] = useState(null)
+  
+  // ... [All your existing state variables remain exactly the same] ...
   const [context, setContext] = useState({ emails: [], documents: [] })
   const [contextBlob, setContextBlob] = useState('')
   const [projectDetails, setProjectDetails] = useState(null)
@@ -31,7 +27,6 @@ export default function Projects() {
   const [activeBrdId, setActiveBrdId] = useState(null)
   const [brdRunning, setBrdRunning] = useState({})
 
-  // Custom Dropdown State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -47,10 +42,11 @@ export default function Projects() {
 
   const [ready, setReady] = useState(false)
   
+  // ... [All your existing useEffects and functions (load, selectProject, handleGenerateBRD, etc.) remain exactly the same] ...
+  
   useEffect(() => { setTimeout(() => setReady(true), 150) }, [])
   useEffect(() => { if (showNewModal) setTimeout(() => newNameRef.current?.focus(), 50) }, [showNewModal])
 
-  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -178,7 +174,6 @@ export default function Projects() {
   const contextCount = context.emails.length + context.documents.length
   const isRunning = brdRunning[active?.id]
   const brdIsReady = !!brdContent
-  const sectionEntries = brdContent ? Object.entries(brdContent) : []
 
   const sidebarEmails = (context.emails || []).map(e => ({
     ...e, sender: e.from_name || e.from || e.sender || 'Unknown sender',
@@ -338,7 +333,7 @@ export default function Projects() {
               </div>
             </div>
 
-            {/* Knowledge Base Repository (Replaces ContextSidebar) */}
+            {/* Knowledge Base Repository */}
             {(sidebarEmails.length > 0 || sidebarDocs.length > 0) && (
               <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-6">
@@ -390,50 +385,32 @@ export default function Projects() {
               />
             </div>
 
-            {/* BRD Article Viewer */}
+            {/* BRD Ready Call-To-Action (Replaces the inline viewer) */}
             {brdIsReady && (
-              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-2xl text-gray-900 mt-8">
-                <div className="bg-gray-50 border-b border-gray-200 px-6 sm:px-10 py-5 flex items-center justify-between sticky top-0 z-10">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-purple-600 font-bold flex items-center gap-2">
-                    <FileText size={16} /> Generated Requirements Document
-                  </div>
-                  {activeBrdId && (
-                    <button 
-                      onClick={() => downloadBrd(activeBrdId, 'pdf')}
-                      className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"
-                    >
-                      <Download size={14} /> Export PDF
-                    </button>
-                  )}
+              <div className="mt-8 bg-purple-500/10 border border-purple-500/20 rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div>
+                  <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-3">
+                    <FileText className="text-purple-400" /> Requirements Document Ready
+                  </h3>
+                  <p className="text-sm text-zinc-400 max-w-xl">
+                    The AI has successfully processed the context and generated the BRD. View, download, or edit it in the BRD Archive.
+                  </p>
                 </div>
-
-                <div className="p-6 sm:p-12 pb-16">
-                  <article className="max-w-[760px] mx-auto space-y-12">
-                    {sectionEntries.map(([k, v], idx) => (
-                      <section key={k} className="scroll-mt-24">
-                        <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-200">
-                          <span className="font-mono text-sm text-purple-600 font-bold bg-purple-100 px-2.5 py-1 rounded-md">
-                            {String(idx + 1).padStart(2, '0')}
-                          </span>
-                          <h2 className="font-sans text-2xl font-bold text-gray-900 tracking-tight">
-                            {LABELS[k] || k}
-                          </h2>
-                        </div>
-                        <div className="prose prose-zinc prose-sm sm:prose-base max-w-none text-gray-700">
-                          <BRDSectionContent sectionKey={k} value={v} />
-                        </div>
-                      </section>
-                    ))}
-                  </article>
-                </div>
+                {/* 3. Replaced <a> tag with button + navigate */}
+                <button 
+                  onClick={() => navigate('/brds')}
+                  className="shrink-0 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-bold transition-all shadow-md flex items-center gap-2"
+                >
+                  View in BRD Archive <ArrowRight size={16} />
+                </button>
               </div>
             )}
+
           </div>
         )}
       </div>
 
       {/* ── MODALS (New Workspace, Paste, Link Email) ── */}
-      {/* New Workspace Modal */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setShowNewModal(false)}>
           <div className="bg-[#121214] border border-white/10 p-8 w-full max-w-md rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -448,7 +425,6 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Paste Modal */}
       {showPasteModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setShowPasteModal(false)}>
           <div className="bg-[#121214] border border-white/10 p-8 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
@@ -466,7 +442,6 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Link Email Modal */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setShowAssignModal(false)}>
           <div className="bg-[#121214] border border-white/10 p-8 w-full max-w-2xl rounded-2xl shadow-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
