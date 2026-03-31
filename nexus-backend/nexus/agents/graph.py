@@ -103,6 +103,7 @@ class AgentState(TypedDict):
     meeting_title:   str
     participants:    list[str]
     calendar_event:  dict
+    calendar_error:  str
 
     # Reply
     draft_subject:   str
@@ -452,7 +453,8 @@ def brd_assembler_node(state: AgentState) -> AgentState:
 def calendar_agent_node(state: AgentState) -> AgentState:
     from services.calendar_service import find_free_slot, create_event
     from services.google_auth import load_credentials
-    from datetime import datetime
+    from services.gmail_service import get_owner_email
+    from datetime import datetime, timezone
     from email.utils import parseaddr
     import dateparser
     import re
@@ -472,8 +474,22 @@ def calendar_agent_node(state: AgentState) -> AgentState:
             participants.append(addr)
 
     sender_addr = parseaddr(state.get("sender", ""))[1]
-    if not participants and sender_addr:
-        participants = [sender_addr]
+    if sender_addr and sender_addr not in participants:
+        participants.append(sender_addr)
+
+    # Ensure at least one attendee (owner) so events can still be created
+    if not participants:
+        try:
+            owner_email = get_owner_email(creds)
+            if owner_email:
+                participants = [owner_email]
+        except Exception:
+            participants = []
+
+    if not participants:
+        state["error"] = "No attendees parsed for calendar event"
+        state["calendar_error"] = state["error"]
+        return state
 
     duration = 30
     preferred = None
@@ -484,6 +500,19 @@ def calendar_agent_node(state: AgentState) -> AgentState:
             preferred = parsed
             break
 
+    # Extra parsing from subject/body if LLM did not extract a slot
+    if not preferred:
+        text_for_date = f"{state.get('subject','')}\n{state.get('body','')[:400]}"
+        parsed_extra = dateparser.parse(text_for_date, settings={"PREFER_DATES_FROM":"future"})
+        if parsed_extra:
+            preferred = parsed_extra
+
+    if preferred:
+        if preferred.tzinfo is None:
+            preferred = preferred.replace(tzinfo=timezone.utc)
+        else:
+            preferred = preferred.astimezone(timezone.utc)
+
     try:
         free_slot = find_free_slot(
             creds,
@@ -493,29 +522,58 @@ def calendar_agent_node(state: AgentState) -> AgentState:
         )
     except Exception as e:
         state["error"] = f"Calendar free/busy lookup failed: {e}"
+        state["calendar_error"] = state["error"]
         return state
 
-    if free_slot:
-        state["free_slot"] = free_slot.isoformat()
-        try:
-            event = create_event(
-                creds,
-                title=state.get("meeting_title", state.get("subject", "Meeting")),
-                start=free_slot,
-                duration_minutes=duration,
-                attendees=participants
-            )
-        except Exception as e:
-            state["error"] = f"Calendar event creation failed: {e}"
-            return state
-        state["calendar_event"] = {
-            "id": event.get("id"),
-            "link": event.get("htmlLink"),
-            "start": free_slot.isoformat(),
-            "title": state.get("meeting_title"),
-        }
+    # If no slot found, fall back to preferred or next workday 10:00 UTC
+    if not free_slot:
+        fallback = preferred
+        if fallback and fallback.tzinfo is None:
+            fallback = fallback.replace(tzinfo=timezone.utc)
+        if not fallback:
+            from datetime import datetime, timedelta
+            now = datetime.now(timezone.utc)
+            fallback = (now + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+        free_slot = fallback
+
+    if free_slot and isinstance(free_slot, datetime) and free_slot.tzinfo is None:
+        free_slot = free_slot.replace(tzinfo=timezone.utc)
+
+    try:
+        event = create_event(
+            creds,
+            title=state.get("meeting_title", state.get("subject", "Meeting")),
+            start=free_slot,
+            duration_minutes=duration,
+            attendees=participants
+        )
+    except Exception as e:
+        state["error"] = f"Calendar event creation failed: {e}"
+        state["calendar_error"] = state["error"]
+        return state
+
+    def _to_iso(val):
+        if isinstance(val, datetime):
+            return val.astimezone(timezone.utc).isoformat()
+        if isinstance(val, str):
+            return val
+        return ""
+
+    event_start_raw = event.get("start")
+    if isinstance(event_start_raw, dict):
+        event_start = event_start_raw.get("dateTime") or event_start_raw.get("date")
     else:
-        state["error"] = "No free slot found in next 7 days"
+        event_start = event_start_raw
+
+    start_iso = _to_iso(event_start) or _to_iso(free_slot)
+    state["free_slot"] = start_iso
+    state["calendar_event"] = {
+        "id": event.get("id"),
+        "link": event.get("htmlLink"),
+        "start": start_iso,
+        "title": state.get("meeting_title") or state.get("subject", "Meeting"),
+    }
+    state["calendar_error"] = ""
 
     return state
 
@@ -534,7 +592,7 @@ def reply_composer_node(state: AgentState) -> AgentState:
     system = f"""Write a professional email reply. Tone: professional and warm.
 Always end with:
 \n\n─────────────────────────────────────
-Sent by NEXUS — Experimental AI Assistant
+Sent by Team Kala dhua's Agent — Experimental AI Assistant
 This message was generated autonomously. Reply if corrections needed.
 
 Return ONLY valid JSON: {{"subject":"Re: ...","body":"full email text"}}"""
@@ -663,6 +721,7 @@ async def run_agent(email: dict, thread_emails: list = None, human_edits: str = 
         "meeting_title":     "",
         "participants":      [],
         "calendar_event":    {},
+        "calendar_error":    "",
         "draft_subject":     "",
         "draft_body":        "",
         "needs_human":       False,
