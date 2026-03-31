@@ -6,9 +6,9 @@ import asyncio, json, os, uuid, tempfile, re, random
 from email.utils import parseaddr
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Request # pyright: ignore[reportMissingImports]
+from fastapi.middleware.cors import CORSMiddleware # pyright: ignore[reportMissingImports]
+from fastapi.responses import FileResponse, HTMLResponse # pyright: ignore[reportMissingImports]
 
 from services.google_auth    import get_auth_url, exchange_code, save_credentials, load_credentials
 from services.gmail_service  import fetch_unread_emails, send_email, mark_read, fetch_thread_emails, get_owner_email, GmailRateLimitError
@@ -447,6 +447,12 @@ async def process_email(email: dict, thread_emails_override: list = None):
     business_category = result.get("business_category", "other")
     urgency_reason = result.get("urgency_reason", "")
 
+    calendar_event = result.get("calendar_event")
+    if isinstance(calendar_event, dict) and not calendar_event.get("start") and not calendar_event.get("id"):
+        # Drop empty shells so UI doesn't render phantom invites
+        calendar_event = None
+    calendar_error = result.get("calendar_error", "")
+
     urgency = max(0, min(int(urgency or 0), 100))
 
     if not is_business_email and not email["id"].startswith("cluster"):
@@ -471,7 +477,8 @@ async def process_email(email: dict, thread_emails_override: list = None):
         "urgency_reason": urgency_reason,
         "draft_subject": result.get("draft_subject",""),
         "draft_body":    result.get("draft_body",""),
-        "calendar_event":result.get("calendar_event"),
+        "calendar_event":calendar_event,
+        "calendar_error":calendar_error,
         "brd_final":     result.get("brd_final"),
         "brd_docx_path": None,
         "brd_job_id":    None,
@@ -515,10 +522,10 @@ async def process_email(email: dict, thread_emails_override: list = None):
         await broadcast({"type":"brd_ready","job_id":job_id, "title": result["brd_final"].get("title","BRD"), "project_id": project_id})
 
     # If calendar event was created — save it
-    if result.get("calendar_event"):
-        store["meetings"].insert(0, result["calendar_event"])
+    if calendar_event:
+        store["meetings"].insert(0, calendar_event)
         await broadcast({"type":"meeting_created",
-                         "meeting": result["calendar_event"]})
+                         "meeting": calendar_event})
 
     existing_action = next((a for a in store["actions"] if a.get("id") == action["id"]), None)
     final_action = action
@@ -570,21 +577,62 @@ async def _send_action_email(action: dict, body: dict):
     final_body    = final_body or action.get("draft_body","")
     final_subject = final_subject or action.get("draft_subject","")
     email         = action.get("email", {})
-    recipient     = email.get("sender_email") or parseaddr(email.get("sender", ""))[1]
-    if not recipient:
-        return {"error":"Cannot determine recipient email address"}
+
+    def _valid(addr: str) -> bool:
+        return bool(addr) and "@" in addr and not any(c in addr for c in ("\r","\n"))
+
+    def _project_fallback(pid: str) -> tuple[str | None, str | None]:
+        if not pid:
+            return None, None
+        try:
+            ctx = db_service.get_project_context_details(pid)
+            for em in ctx.get("emails", []):
+                raw = em.get("sender_email") or em.get("sender") or ""
+                cand = parseaddr(raw)[1]
+                if _valid(cand):
+                    return cand, raw
+        except Exception:
+            pass
+        return None, None
+
+    raw_recipient = email.get("sender_email") or email.get("sender", "") or ""
+    recipient     = parseaddr(raw_recipient)[1]
+
+    if not _valid(recipient):
+        fallback_recipient, fallback_raw = _project_fallback(email.get("project_id"))
+        if fallback_recipient:
+            recipient = fallback_recipient
+            raw_recipient = fallback_raw or raw_recipient
+            await broadcast({"type":"log","level":"info","msg":f"Using project sender fallback: {recipient}"})
+        else:
+            msg = f"Invalid recipient email address: {raw_recipient or '(empty)'}"
+            await broadcast({"type":"log","level":"error","msg":msg})
+            return {"error": msg}
+
+    thread_id = email.get("thread_id")
+    message_id = email.get("message_id") or email.get("id")
+
+    def _synthetic(val: str) -> bool:
+        if not val:
+            return True
+        return val.startswith(("thread_cluster", "thread_user", "cluster_", "proj_"))
+
+    safe_thread_id = None if _synthetic(thread_id) else thread_id
+    safe_message_id = None if _synthetic(message_id) else message_id
 
     await run_blocking(
         send_email, creds,
         to=[recipient],
         subject=final_subject,
         body=final_body,
-        thread_id=email.get("thread_id"),
-        message_id=email.get("message_id"),
+        thread_id=safe_thread_id,
+        message_id=safe_message_id,
         attachment_path=action.get("brd_docx_path"),
     )
 
-    await run_blocking(mark_read, creds, action.get("id"))
+    if safe_message_id:
+        await run_blocking(mark_read, creds, safe_message_id)
+
     action["status"]      = "sent"
     action["executed_at"] = datetime.utcnow().isoformat()
     await broadcast({"type":"action_update","id":action.get("id"),"status":"sent"})
@@ -763,7 +811,7 @@ async def manual_group_process(req: ClusterRequest):
     if project:
         for em in selected_emails:
             try:
-                db_service.link_email_to_project(em.get("id"), project.get("id"))
+                db_service.link_email_to_project(em.get("id"), project.get("id"), email_data=em)
             except Exception:
                 pass
     
@@ -917,8 +965,10 @@ async def approve_action(action_id: str, body: dict = {}):
         
         # 2. Link all emails to this project
         email_ids = action.get("email_ids", [])
+        raw_emails = action["email"].get("cluster_raw_emails", [])
+        email_map = {em.get("id"): em for em in raw_emails if isinstance(em, dict)}
         for eid in email_ids:
-            db_service.link_email_to_project(eid, project_id)
+            db_service.link_email_to_project(eid, project_id, email_data=email_map.get(eid))
             
         await broadcast({"type":"log", "level":"ok", "msg":f"Project '{proj_name}' created (ID: {project_id}). Emails linked."})
         await broadcast({"type":"log", "level":"warn", "msg":f"Human Approved Cluster! Firing BRD Extractor..."})
@@ -1126,13 +1176,18 @@ async def get_unassigned():
 async def assign_email(project_id: str, data: dict):
     email_id = data.get("email_id")
     if not email_id: return {"error":"Missing email_id"}
-    db_service.link_email_to_project(email_id, project_id)
+    # Try to pass cached email details to avoid null inserts
+    cached_email = next((e for e in store.get("latest_emails", []) if e.get("id") == email_id), None)
+    try:
+        updated = db_service.link_email_to_project(email_id, project_id, email_data=cached_email)
+    except Exception as e:
+        return {"error": str(e)}
     try:
         bandit_reward(project_id, 1.0, email_id=email_id, event="assign")
     except Exception:
         pass
     await broadcast({"type":"log","level":"info","msg":f"Email linked to project {project_id}"})
-    return {"status":"linked"}
+    return {"status":"linked","email": updated}
 
 @app.post("/api/projects/{project_id}/upload-doc")
 async def upload_project_doc(project_id: str, file: UploadFile = File(...)):

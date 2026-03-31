@@ -51,6 +51,13 @@ def find_free_slot(
     preferred_start:  datetime = None,
 ) -> datetime | None:
     """Find first real slot where ALL attendees + owner are free."""
+    if preferred_start:
+        # Normalize to UTC to avoid naive vs aware comparison errors
+        if preferred_start.tzinfo is None:
+            preferred_start = preferred_start.replace(tzinfo=timezone.utc)
+        else:
+            preferred_start = preferred_start.astimezone(timezone.utc)
+
     now      = datetime.now(timezone.utc)
     end_date = now + timedelta(days=DAYS)
 
@@ -117,7 +124,7 @@ def create_event(
     end = start + timedelta(minutes=duration_minutes)
     evt = {
         "summary":     title,
-        "description": (description + "\n\n[Scheduled by NEXUS — Experimental AI Assistant]").strip(),
+        "description": (description + "\n\n[Scheduled by Kala dhua agent — Experimental AI Assistant]").strip(),
         "start":  {"dateTime": start.isoformat(), "timeZone": "UTC"},
         "end":    {"dateTime": end.isoformat(),   "timeZone": "UTC"},
         "attendees": [{"email": e} for e in attendees],
