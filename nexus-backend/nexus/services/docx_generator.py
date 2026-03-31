@@ -5,6 +5,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from datetime import datetime
+import re
 
 
 def _hr(doc):
@@ -15,6 +16,22 @@ def _hr(doc):
     bot.set(qn('w:val'),'single'); bot.set(qn('w:sz'),'4')
     bot.set(qn('w:space'),'1');    bot.set(qn('w:color'),'DDDDDD')
     b.append(bot); pr.append(b)
+
+
+def _strip_md_noise(text: str) -> str:
+    """Remove markdown noise (headings, bold markers, backticks) while keeping content."""
+    if not text:
+        return ""
+    # Strip heading markers at line starts
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.M)
+    # Remove bold/italic markers
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"__(.*?)__", r"\1", text)
+    text = re.sub(r"\*(.*?)\*", r"\1", text)
+    text = re.sub(r"_(.*?)_", r"\1", text)
+    # Strip inline code backticks
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    return text
 
 
 def generate_docx(brd: dict, path: str = "BRD.docx") -> str:
@@ -71,6 +88,8 @@ def generate_docx(brd: dict, path: str = "BRD.docx") -> str:
             content = "\n".join([str(item) for item in content])
         if not content: 
             continue
+
+        content = _strip_md_noise(str(content))
 
         h = doc.add_heading(level=1); h.clear()
         r = h.add_run(title)

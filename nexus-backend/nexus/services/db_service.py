@@ -73,9 +73,31 @@ def get_unassigned_emails() -> List[Dict]:
     res = db.table("emails").select("*").is_("project_id", "null").order("received_at", desc=True).execute()
     return res.data or []
 
-def link_email_to_project(email_id: str, project_id: str):
+def link_email_to_project(email_id: str, project_id: str, email_data: Optional[Dict] = None):
+    """Attach an email to a project, inserting the email row if it does not exist."""
     db = get_db()
-    db.table("emails").update({"project_id": project_id}).eq("id", email_id).execute()
+    res = db.table("emails").update({"project_id": project_id}).eq("id", email_id).execute()
+    data = res.data or []
+    if data:
+        return data[0]
+
+    if email_data:
+        # Upsert full record to avoid null rows
+        record = {
+            "id": email_id,
+            "thread_id": email_data.get("thread_id"),
+            "sender": email_data.get("sender"),
+            "subject": email_data.get("subject"),
+            "body": email_data.get("body"),
+            "project_id": project_id,
+            "received_at": email_data.get("received_at") or email_data.get("date"),
+            "is_processed": email_data.get("is_processed", False),
+        }
+        upsert_res = db.table("emails").upsert(record, on_conflict="id").execute()
+        if upsert_res.data:
+            return upsert_res.data[0]
+
+    raise ValueError(f"Email {email_id} not found or not updated")
 
 # --- Documents ---
 def add_document(project_id: str, filename: str, content: str, doc_type: str = "transcript"):
@@ -123,6 +145,8 @@ def get_project_context_string(project_id: str) -> str:
 
     def _scrub_noise(text: str) -> str:
         import re
+        if not text:
+            return ""
         text = re.sub(r"(?i)(Message-ID|Date|From|To|Subject|Mime-Version|Content-Type|X-[a-zA-Z-]+):.*?\n", "", text)
         text = re.sub(r"\b(um|uh|like|you know|I mean|yeah|okay|right)\b", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\n{3,}", "\n\n", text)
