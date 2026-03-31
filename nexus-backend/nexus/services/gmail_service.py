@@ -190,9 +190,10 @@ def send_email(
     full_body = body + DISCLAIMER
     cleaned_to = []
     for recipient in to:
-        addr = parseaddr(recipient)[1] if recipient else ""
-        if addr:
-            cleaned_to.append(addr)
+        addr = parseaddr(recipient or "")[1].strip()
+        if not addr or "@" not in addr or any(c in addr for c in ("\r","\n")):
+            continue
+        cleaned_to.append(addr)
     if not cleaned_to:
         raise ValueError("No valid recipient email addresses provided")
 
