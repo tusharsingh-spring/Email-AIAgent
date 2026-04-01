@@ -43,7 +43,7 @@ function IntroLoader() {
         <span className={stage >= 1 ? 'up' : ''}>WELCOME</span>
       </div>
       <div className="loader-word" style={{ color: 'var(--color-brand-blue)' }}>
-        <span className={stage >= 2 ? 'up' : ''}>NEXUS</span>
+        <span className={stage >= 2 ? 'up' : ''}>Kala Dhua</span>
       </div>
       <div className="w-[160px] h-[1px] bg-white/10 mt-5">
         <div className="h-full bg-brand-blue transition-all duration-700 ease-out"
