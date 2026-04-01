@@ -68,7 +68,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
         <div className="px-7 pt-7 pb-4 border-b border-brand-border relative z-10">
           <div className="flex items-center gap-2">
             <div className="font-bebas text-5xl tracking-widest text-brand-text leading-none">
-              NEXUS<span className="text-brand-blue">.</span>
+              Codeapex<span className="text-brand-blue">.</span>
             </div>
             <div className="pulse-dot w-2 h-2 rounded-full bg-brand-blue mt-1 shrink-0" style={{ boxShadow: '0 0 6px rgba(0,181,226,0.8)' }} />
           </div>
