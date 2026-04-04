@@ -5,8 +5,10 @@ import { Activity, CheckCircle2, XCircle, Clock, Loader2, MailCheck, AlertTriang
 
 // Helper to format time cleanly
 const FT = iso => {
-  try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
-  catch { return iso || '' }
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso || '—')
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // Polished, muted accent colors instead of bright raw neons
@@ -48,6 +50,7 @@ function ActionRow({ action, globalIdx, onUpdate }) {
   const intTheme = INTENT_THEME[a.intent] || INTENT_THEME.general
   const confidence = a.agent_state?.confidence ?? a.confidence
   const escalationReason = a.agent_state?.escalation_reason || a.escalation_reason
+  const hasCalendar = !!(a.calendar_event && (a.calendar_event.start || a.calendar_event.id || a.calendar_event.title))
 
   const handleApprove = async (e) => {
     e.stopPropagation()
@@ -224,11 +227,17 @@ function ActionRow({ action, globalIdx, onUpdate }) {
               </div>
 
               {/* Integrations (Calendar / BRD) */}
-              {a.calendar_event && (
+              {hasCalendar && (
                 <div className="mt-4 p-3 rounded-lg border border-teal-500/20 bg-teal-500/5 font-sans text-sm flex items-center gap-2">
                   <span className="text-teal-400">📅 Scheduled:</span>{' '}
                   <span className="text-zinc-300 font-medium">{a.calendar_event.title}</span>
                   <span className="text-zinc-500 text-xs ml-auto font-mono">{FT(a.calendar_event.start)}</span>
+                </div>
+              )}
+
+              {a.calendar_error && (
+                <div className="mt-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 font-sans text-xs text-amber-300">
+                  Calendar error: {a.calendar_error}
                 </div>
               )}
 
