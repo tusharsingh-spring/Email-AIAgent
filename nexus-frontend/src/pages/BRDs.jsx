@@ -16,6 +16,37 @@ const LABELS = {
   timeline_milestones: 'Timeline & Milestones',
 }
 
+// --- NEW CLEANUP UTILITIES ---
+
+// 1. Removes markdown noise from a single string
+const cleanMarkdown = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  return text
+    .replace(/^#{1,6}\s*/gm, '') // Remove heading markers (##, ###)
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold (**)
+    .replace(/__(.*?)__/g, '$1') // Remove bold (__)
+    .replace(/\*(.*?)\*/g, '$1') // Remove italics (*)
+    .replace(/_(.*?)_/g, '$1') // Remove italics (_)
+    .replace(/`([^`]+)`/g, '$1') // Remove inline code backticks (`)
+    .replace(/^[\*\+]\s/gm, '• ') // Replace list markers (* or +) with a clean bullet
+}
+
+// 2. Recursively cleans nested objects/arrays before passing to BRDSectionContent
+const cleanData = (val) => {
+  if (typeof val === 'string') return cleanMarkdown(val);
+  if (Array.isArray(val)) return val.map(cleanData);
+  if (val !== null && typeof val === 'object') {
+    const cleaned = {};
+    for (const [k, v] of Object.entries(val)) {
+      cleaned[k] = cleanData(v);
+    }
+    return cleaned;
+  }
+  return val;
+}
+
+// -----------------------------
+
 function BRDCard({ jobId, brd }) {
   const [open, setOpen] = useState(false)
   const [sections, setSections] = useState(null)
@@ -58,7 +89,7 @@ function BRDCard({ jobId, brd }) {
         
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <h3 className="font-sans text-lg font-semibold text-white truncate mb-1.5 leading-tight">
-            {brd.title || 'Untitled BRD'}
+            {cleanMarkdown(brd.title) || 'Untitled BRD'}
           </h3>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono text-[11px] text-zinc-400 font-medium">
@@ -127,8 +158,9 @@ function BRDCard({ jobId, brd }) {
                       <div className="font-mono text-[11px] uppercase tracking-widest text-purple-400 font-semibold mb-2 flex items-center gap-2">
                         <FileText size={14} /> AI Executive Summary
                       </div>
-                      <p className="font-sans text-sm text-zinc-300 leading-relaxed">
-                        {meta.summary}
+                      <p className="font-sans text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                        {/* Clean the summary before rendering */}
+                        {cleanMarkdown(meta.summary)}
                       </p>
                     </div>
                   )}
@@ -141,11 +173,12 @@ function BRDCard({ jobId, brd }) {
                           {String(i + 1).padStart(2, '0')}
                         </span>
                         <h4 className="font-sans text-base font-semibold text-zinc-100">
-                          {LABELS[key] || key}
+                          {LABELS[key] || cleanMarkdown(key)}
                         </h4>
                       </div>
-                      <div className="p-5 font-sans text-sm text-zinc-400 leading-relaxed overflow-x-auto">
-                        <BRDSectionContent sectionKey={key} value={value} />
+                      <div className="p-5 font-sans text-sm text-zinc-400 leading-relaxed overflow-x-auto whitespace-pre-wrap">
+                        {/* Pass cleanly formatted data to your section component */}
+                        <BRDSectionContent sectionKey={key} value={cleanData(value)} />
                       </div>
                     </div>
                   ))}
